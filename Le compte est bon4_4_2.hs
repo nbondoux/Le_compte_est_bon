@@ -1,6 +1,10 @@
 module Main where 
 
-{- Le compte est bon ; haskell version -}
+{- Le compte est bon ; haskell version
+   algo in this version returns a list of solutions from the first found to
+   the best one, by using the continuation style (without monads)
+   main function evaluate each elements of the list and display them   
+ -}
 import IO
 import System
 import Char
@@ -36,12 +40,10 @@ op_priority (Noeud _ _ _ Mult) = 2
 op_priority (Noeud _ _ _ Divi) = 2
 op_priority (Nombre _ ) = 100
 
-profondeur_arbre (Noeud _ ag ad _ ) = profondeur_arbre ag + 
-                                      profondeur_arbre ad + 1
+profondeur_arbre (Noeud _ ag ad _ ) = profondeur_arbre ag + profondeur_arbre ad + 1
 profondeur_arbre  (Nombre _ ) =  0
 
-{- retourne le "poids" des opérateurs de l'arbre; pas utilisé dans cette 
-   version de l'algo -}
+{- retourne le "poids" des opérateurs de l'arbre; pas utilisé dans cette version de l'algo -}
 poids_arbre (Noeud _ ag ad Plus) = 1 + poids_arbre ag + poids_arbre ad
 poids_arbre (Noeud _ ag ad Moins) = 2 + poids_arbre ag + poids_arbre ad
 poids_arbre (Noeud _ ag ad Mult) = 3 + poids_arbre ag + poids_arbre ad
@@ -58,136 +60,125 @@ instance Show Arbre where
                else
                    show a
               )
-           ++
-           (
-            show op
-           )
-           ++
-           (
-            if (op_priority b <= op_priority arbre) then
-	        "("++(show b)++")"
-	    else
-	        show b
-           )
+              ++
+              (show op)
+              ++
+              (	      
+               if (op_priority b <= op_priority arbre) then
+	           "("++(show b)++")"
+	       else
+	           show b
+	      )    
           (Nombre a)  ->  show a
 
 construct_arbre = construct_arbre_rt [] where
-                  construct_arbre_rt base (n:l1) = construct_arbre_rt 
-                                                   (base++[Nombre n]) l1
+                  construct_arbre_rt base (n:l1) = construct_arbre_rt (base++[Nombre n]) l1
                   construct_arbre_rt base [] = base;;
 
 valeur_Noeud (Noeud e _ _ _) = e
 valeur_Noeud (Nombre y) = y 
 
+{- in all these algo* functions, "future" continuation always take as parameter
+   the best solution known -}
 
-
-algo2_pred prof sol p = 
+algo2_pred prof sol p future = 
     case sol of 
       (Just (_,n_pr))->
-          if  prof >= n_pr then
-	      return sol
+          if prof >= n_pr then
+	      future sol
 	  else
-	      p
-      Nothing -> p 
+	      p (\new_sol -> future new_sol)
+      Nothing -> p (\new_sol -> future new_sol)
+
+{- utility function: return Just x where x is the first element of the list 
+   verifying the predicate, or Nothing if no element is found -}
+listFind p (x:l) = if (p x) then Just x else listFind p l 
+listFind p [] = Nothing
 
 
-algo l prof best_res  cible=
+algo l prof best_res cible future =
   let length_is_one [_] = True 
       length_is_one _ = False
   in
-    case find (\x -> valeur_Noeud x == cible) l of
+    case listFind (\x -> valeur_Noeud x == cible) l of
       Just sol ->
           let profa = profondeur_arbre sol in 
-          do
-            putStr ((show cible)++" = "++(show sol)++" ; "++(show profa)++
-                                    "\n")	
-	    return (Just (sol,profa))
+	  (sol,profa):future (Just (sol,profa))
       Nothing ->
-      	
 	case best_res of
 	  Just (_,pm) ->
 	      if prof >= pm - 1 || length_is_one l  then
-		  return best_res
+		  future best_res
 	      else
-		  algo2 l (prof+1) best_res  cible
+		  algo2 l (prof+1) best_res cible (\sol -> future sol)
 	      
 	  Nothing -> 
 	      if length_is_one l  then
-	          return best_res
+	          future best_res
 	      else
-	          algo2 l (prof+1) best_res  cible
+	          algo2 l (prof+1) best_res cible (\sol -> future sol)
  
     
-algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf iOp =
+algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf iOp future =
     let val_a = valeur_Noeud iA in
     let val_b = valeur_Noeud iB in
-    let subList = iBase++iTail in
-
-    let next_algo1 iMy_list = (
-                             do
-                               sol <- algo iMy_list iProf iBest_res iCible
-                               iPred sol (algo2_foreach_op iA iB iBase iTail iPred sol iCible iProf (iOp+1))
-                            )
+    let next_algo my_list =
+         algo my_list iProf iBest_res iCible (\sol ->
+              iPred sol (algo2_foreach_op iA iB iBase iTail iPred sol iCible iProf (iOp+1)) future)
     in
     if (iOp == 0) then
-      	next_algo1 ((Noeud (val_a+val_b) iA iB Plus):subList)
+      	next_algo (iBase++[(Noeud (val_a+val_b) iA iB Plus)]++iTail)
     else 
         if (iOp == 1) then 
-            next_algo1 ((Noeud (val_a-val_b) iA iB Moins):subList)
+            next_algo (iBase++[(Noeud (val_a-val_b) iA iB Moins)]++iTail)
       	else
             if (iOp == 2) then
-        	next_algo1 ((Noeud (val_a*val_b) iA iB Mult):subList)
+        	next_algo (iBase++[(Noeud (val_a*val_b) iA iB Mult)]++iTail)
             else
                 if (iOp == 3) then
       	            if (val_b /= 0  &&  (val_a `mod` val_b) == 0) then
-	                next_algo1 ((Noeud (div val_a val_b) iA iB Divi):subList)
+                        next_algo (iBase++[(Noeud (div val_a val_b) iA iB Divi)]++iTail)
 	            else
-	                algo2_foreach_op iA iB iBase 
-                                     iTail iPred iBest_res iCible iProf (iOp+1)
+	                algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf (iOp+1) (\sol -> future sol)
                 else
                     if (iOp == 4) then
-      	                next_algo1 ((Noeud (val_b-val_a) iB iA Moins):subList)
+                        next_algo(iBase++[(Noeud (val_b-val_a) iB iA Moins)]++iTail)
                     else
                         if (iOp == 5) then
       	                    if (val_a /= 0 &&  (val_b `mod` val_a) == 0) then
-	  	                next_algo1 ((Noeud (div val_b val_a) iB iA Divi)
-                                            :subList)
+	  	                next_algo (iBase++[(Noeud (div val_b val_a) iB iA Divi)]++iTail)
 	                    else
-	                        return iBest_res
-                        else
-                            return iBest_res
+	                        future (iBest_res)
+                        else 
+                            future (iBest_res)
 
-algo2_foreach_b iA iBase iList iPred iBest_res iCible iProf =
+algo2_foreach_b iA iBase iList iPred iBest_res iCible iProf future =
  case iList of
-      b:l ->
-          do
-            sol <- algo2_foreach_op iA b iBase l iPred iBest_res iCible iProf 0
-            iPred sol (algo2_foreach_b iA (b:iBase) l iPred sol 
-                                       iCible iProf)
-      [] -> return iBest_res
+      b:l -> algo2_foreach_op iA b iBase l iPred iBest_res iCible 
+	     iProf 0 (\sol ->
+	     iPred sol (algo2_foreach_b iA (iBase++[b]) l iPred sol iCible iProf) future)
+      [] -> future iBest_res
 
-algo2_foreach_a_b iBase iList iPred iBest_res iCible iProf=
+algo2_foreach_a_b iBase iList iPred iBest_res iCible iProf future=
   case iList of
-    a:l ->
-        do
-          sol <-  algo2_foreach_b a iBase l iPred iBest_res iCible iProf
-	  iPred sol (algo2_foreach_a_b (a:iBase) l iPred sol iCible iProf)
-    [] -> return iBest_res
+      a:l -> algo2_foreach_b a iBase l iPred iBest_res iCible iProf (\sol ->
+	     iPred sol (algo2_foreach_a_b (iBase++[a]) l iPred sol iCible iProf)
+             future)
+      [] -> future iBest_res
 
-algo2  l iProf iBest_res iCible =
-  algo2_foreach_a_b [] l (algo2_pred iProf) iBest_res iCible iProf
+algo2 l iProf iBest_res iCible future =
+  algo2_foreach_a_b [] l (algo2_pred iProf) iBest_res iCible iProf (\sol -> future (sol))
 
 le_compte_est_bon liste cible =
-    do 
-      sol <- (algo (construct_arbre liste) 0 Nothing  cible) 
-      case sol of
-        Just (a,_) -> 
+    showSolutions (algo (construct_arbre liste) 0 Nothing cible (\_->[])) where
+        showSolutions ((sol,pr_sol):l) =
             do
               putStr (show cible)
-              putStr (" = "++(show a)++"\n")
-        Nothing-> 
+              putStr (" = "++(show sol)++" ; "++(show pr_sol)++"\n")
+              showSolutions l
+        showSolutions [] =
             do
-              putStr "No Solution\n"
+              putStr "No more solution\n"
 
 message_help iProgName =
     do
@@ -199,11 +190,9 @@ main=
       args <- getArgs
       progName <- getProgName
       let longueur = (List.length args)
-      if (longueur <2 || (List.elem "-h" args) || (List.elem "--help" args))
-       then 
+      if (longueur <2 || (List.elem "-h" args) || (List.elem "--help" args)) then 
           message_help progName
        else 
            let intArgs = List.map (\x  -> read x) args in
-           le_compte_est_bon (List.take (longueur -1) intArgs) 
-                                 (List.last intArgs) 
+           le_compte_est_bon (List.take (longueur -1) intArgs) (List.last intArgs) 
       
