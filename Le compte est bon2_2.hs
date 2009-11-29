@@ -61,8 +61,8 @@ instance Show Arbre where
           (Nombre a)  ->  show a
 
 construct_arbre = construct_arbre_rt [] where
-                  construct_arbre_rt base (n:l1) = construct_arbre_rt (base++[Nombre n]) l1
-                  construct_arbre_rt base [] = base;;
+                  construct_arbre_rt base (n:l1) = construct_arbre_rt ((Nombre n):base) l1
+                  construct_arbre_rt base [] = reverse base;;
 
 valeur_Noeud (Noeud e _ _ _) = e
 valeur_Noeud (Nombre y) = y 
@@ -156,4 +156,3 @@ main=
        else 
            let intArgs = List.map (\x  -> read x) args in
            le_compte_est_bon (List.take (longueur -1) intArgs) (List.last intArgs) 
-      
