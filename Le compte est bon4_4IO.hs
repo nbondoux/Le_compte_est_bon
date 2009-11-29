@@ -90,17 +90,12 @@ algo2_pred prof sol p =
 	      p
       Nothing -> p 
 
-{- utility function: return Just x where x is the first element of the list 
-   verifying the predicate, or Nothing if no element is found -}
-listFind p (x:l) = if (p x) then Just x else listFind p l 
-listFind p [] = Nothing
-
 
 algo l prof best_res  cible=
   let length_is_one [_] = True 
       length_is_one _ = False
   in
-    case listFind (\x -> valeur_Noeud x == cible) l of
+    case find (\x -> valeur_Noeud x == cible) l of
       Just sol ->
           let profa = profondeur_arbre sol in 
           do
