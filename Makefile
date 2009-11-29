@@ -1,4 +1,4 @@
-all2: Le\ compte\ est\ bon Le\ compte\ est\ bon2 Le\ compte\ est\ bon2_2 Le\ compte\ est\ bon3_byte Le\ compte\ est\ bon4 Le\ compte\ est\ bon4_2 Le\ compte\ est\ bon4_3 Le\ compte\ est\ bon4_4 Le\ compte\ est\ bon4_4_c Le\ compte\ est\ bon4_4_c_rapide Le\ compte\ est\ bon4_4_hs Le\ compte\ est\ bon2_2_hs Le\ compte\ est\ bon4_4_hsIO Le\ compte\ est\ bon4_4_c_rapide_2
+all2: Le\ compte\ est\ bon Le\ compte\ est\ bon2 Le\ compte\ est\ bon2_2 Le\ compte\ est\ bon3_byte Le\ compte\ est\ bon4 Le\ compte\ est\ bon4_2 Le\ compte\ est\ bon4_3 Le\ compte\ est\ bon4_4 Le\ compte\ est\ bon4_4_c Le\ compte\ est\ bon4_4_c_rapide Le\ compte\ est\ bon4_4_hs Le\ compte\ est\ bon2_2_hs Le\ compte\ est\ bon2_2_2_hs Le\ compte\ est\ bon4_4_hsIO Le\ compte\ est\ bon4_4_c_rapide_2
 all: all2 Le\ compte\ est\ bon_2 Le\ compte\ est\ bon4_4_gmp
 
 
@@ -39,6 +39,9 @@ Le\ compte\ est\ bon4_4_gmp:Le\ compte\ est\ bon4_4_gmp.ml
 
 Le\ compte\ est\ bon2_2_hs:Le\ compte\ est\ bon2_2.hs
 	ghc Le\ compte\ est\ bon2_2.hs -O9 -o Le\ compte\ est\ bon2_2_hs
+
+Le\ compte\ est\ bon2_2_2_hs:Le\ compte\ est\ bon2_2_2.hs
+	ghc Le\ compte\ est\ bon2_2_2.hs -O9 -o Le\ compte\ est\ bon2_2_2_hs
 
 Le\ compte\ est\ bon4_4_hs:Le\ compte\ est\ bon4_4.hs
 	ghc Le\ compte\ est\ bon4_4.hs -O9 -o Le\ compte\ est\ bon4_4_hs
