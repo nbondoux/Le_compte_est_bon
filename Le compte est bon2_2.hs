@@ -62,7 +62,7 @@ instance Show Arbre where
 
 construct_arbre = construct_arbre_rt [] where
                   construct_arbre_rt base (n:l1) = construct_arbre_rt ((Nombre n):base) l1
-                  construct_arbre_rt base [] = reverse base;;
+                  construct_arbre_rt base [] = reverse base
 
 valeur_Noeud (Noeud e _ _ _) = e
 valeur_Noeud (Nombre y) = y 
@@ -73,19 +73,21 @@ valeur_Noeud (Nombre y) = y
 listFind p (x:l) = if (p x) then Just x else listFind p l 
 listFind p [] = Nothing
 
+{- in all these functions, the "future" continuation never takes any arguments;
+   so, as there is lazy evaluation, its type is what would be its return type -}
 
 algo l cible future=
   let length_is_one [_] = True 
       length_is_one _ = False
   in
     case listFind (\x -> valeur_Noeud x == cible) l of
-      Just sol -> Just sol
+      Just sol -> sol:future
       Nothing -> algo2 l cible future
      
 algo2_foreach_op iA iB iBase iTail iCible iOp future =
     let val_a = valeur_Noeud iA in
     let val_b = valeur_Noeud iB in
-    let algo_next my_list = algo my_list iCible (\() ->
+    let algo_next my_list = algo my_list iCible (
            algo2_foreach_op iA iB iBase iTail iCible (iOp+1) future)
     in
     if (iOp == 0) then
@@ -110,37 +112,39 @@ algo2_foreach_op iA iB iBase iTail iCible iOp future =
       	                    if (val_a /= 0 &&  (val_b `mod` val_a) == 0) then
 	  	                algo_next (iBase++[(Noeud (div val_b val_a) iB iA Divi)]++iTail)
 	                    else
-	                        future ()
+	                        future
                         else 
-                            future ()
+                            future
 
 algo2_foreach_b iA iBase iList iCible future =
  case iList of
-      b:l -> algo2_foreach_op iA b iBase l iCible 0 (\() ->
+      b:l -> algo2_foreach_op iA b iBase l iCible 0 (
 	     algo2_foreach_b iA (iBase++[b]) l iCible future
                                                        )
-      [] -> future ()
+      [] -> future
 
 algo2_foreach_a_b iBase iList iCible future=
   case iList of
-      a:l -> algo2_foreach_b a iBase l iCible (\() ->
+      a:l -> algo2_foreach_b a iBase l iCible (
 	     algo2_foreach_a_b (iBase++[a]) l iCible future
                                               )
-      [] -> future ()
+      [] -> future
 
 algo2 l iCible future=
   algo2_foreach_a_b [] l iCible future
 
 le_compte_est_bon liste cible =
- case (algo (construct_arbre liste) cible (\() -> Nothing)) of
-   Just a -> 
-       do
-         putStr (show cible)
-         putStr (" = "++(show a)++"\n")
-   Nothing-> 
-       do
-         putStr "No Solution\n"
-
+    showSolutions (algo (construct_arbre liste) cible []) where
+        showSolutions (a:l) =
+            do
+              putStr (show cible)
+              putStr (" = "++(show a)++"\n")
+                     {-"uncomment this if you want to display all the solutions showSolutions l -}
+        showSolutions [] =
+            do
+              putStr "No more solution\n"
+        
+                     
 message_help iProgName =
     do
       putStr (iProgName++" number1 [number 2 [number 3 ...]] target\n")
