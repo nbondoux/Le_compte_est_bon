@@ -174,8 +174,11 @@ algo2_foreach_a_b iBase iList iPred iBest_res iCible iProf =
 algo2 l iProf iBest_res iCible =
     algo2_foreach_a_b [] l (algo2_pred iProf) iBest_res iCible iProf
 
+{- algo_main :: (Num t, Ord t) => [Arbre] -> Int -> [(Arbre, t)] -}
+algo_main l cible = (`runCont` (\_->[])) $ algo l 0 Nothing cible
+
 le_compte_est_bon liste cible =
-    showSolutions ((`runCont` (\_->[])) $ algo (construct_arbre liste) 0 Nothing cible) where
+    showSolutions (algo_main (construct_arbre liste) cible) where
         showSolutions ((sol,pr_sol):l) =
             do
               putStr (show cible)
