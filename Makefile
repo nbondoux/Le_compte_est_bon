@@ -1,4 +1,4 @@
-all2: Le\ compte\ est\ bon Le\ compte\ est\ bon2 Le\ compte\ est\ bon2_2 Le\ compte\ est\ bon3_byte Le\ compte\ est\ bon4 Le\ compte\ est\ bon4_2 Le\ compte\ est\ bon4_3 Le\ compte\ est\ bon4_4 Le\ compte\ est\ bon4_4_c Le\ compte\ est\ bon4_4_c_rapide Le\ compte\ est\ bon4_4_hs Le\ compte\ est\ bon2_2_hs Le\ compte\ est\ bon2_2_2_hs Le\ compte\ est\ bon4_4_hsIO Le\ compte\ est\ bon4_4_2_hs Le\ compte\ est\ bon4_4_c_rapide_2
+all2: Le\ compte\ est\ bon Le\ compte\ est\ bon2 Le\ compte\ est\ bon2_2 Le\ compte\ est\ bon3_byte Le\ compte\ est\ bon4 Le\ compte\ est\ bon4_2 Le\ compte\ est\ bon4_3 Le\ compte\ est\ bon4_4 Le\ compte\ est\ bon4_4_c Le\ compte\ est\ bon4_4_c_rapide Le\ compte\ est\ bon4_4_hs Le\ compte\ est\ bon2_2_hs Le\ compte\ est\ bon2_2_2_hs Le\ compte\ est\ bon4_4_hsIO Le\ compte\ est\ bon4_4_2_hs Le\ compte\ est\ bon4_4_3_hs Le\ compte\ est\ bon4_4_c_rapide_2
 all: all2 Le\ compte\ est\ bon_2 Le\ compte\ est\ bon4_4_gmp
 
 
@@ -49,10 +49,13 @@ Le\ compte\ est\ bon4_4_hs:Le\ compte\ est\ bon4_4.hs
 Le\ compte\ est\ bon4_4_2_hs:Le\ compte\ est\ bon4_4_2.hs
 	ghc Le\ compte\ est\ bon4_4_2.hs -O9 -o Le\ compte\ est\ bon4_4_2_hs
 
+Le\ compte\ est\ bon4_4_3_hs:Le\ compte\ est\ bon4_4_3.hs
+	ghc Le\ compte\ est\ bon4_4_3.hs -O9 -package mtl -o Le\ compte\ est\ bon4_4_3_hs
+
 Le\ compte\ est\ bon4_4_hsIO:Le\ compte\ est\ bon4_4IO.hs
 	ghc Le\ compte\ est\ bon4_4IO.hs -O9 -o Le\ compte\ est\ bon4_4_hsIO
 
 clean:
 	rm -f *.cm* *.o *.hi 
 cleanall:
-	rm -f *.cm* *.o *.hi Le\ compte\ est\ bon Le\ compte\ est\ bon2 Le\ compte\ est\ bon2_2 Le\ compte\ est\ bon3_byte Le\ compte\ est\ bon_2 Le\ compte\ est\ bon4 Le\ compte\ est\ bon4_2 Le\ compte\ est\ bon4_3 Le\ compte\ est\ bon4_4  Le\ compte\ est\ bon4_4_c Le\ compte\ est\ bon4_4_hs Le\ compte\ est\ bon4_4_hsIO
+	rm -f *.cm* *.o *.hi Le\ compte\ est\ bon Le\ compte\ est\ bon2 Le\ compte\ est\ bon2_2 Le\ compte\ est\ bon3_byte Le\ compte\ est\ bon4 Le\ compte\ est\ bon4_2 Le\ compte\ est\ bon4_3 Le\ compte\ est\ bon4_4 Le\ compte\ est\ bon4_4_c Le\ compte\ est\ bon4_4_c_rapide Le\ compte\ est\ bon4_4_hs Le\ compte\ est\ bon2_2_hs Le\ compte\ est\ bon2_2_2_hs Le\ compte\ est\ bon4_4_hsIO Le\ compte\ est\ bon4_4_2_hs Le\ compte\ est\ bon4_4_3_hs Le\ compte\ est\ bon4_4_c_rapide_2 Le\ compte\ est\ bon_2 Le\ compte\ est\ bon4_4_gmp
