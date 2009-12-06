@@ -39,13 +39,6 @@ op_priority (Nombre _ ) = 100
 profondeur_arbre (Noeud _ ag ad _ ) = profondeur_arbre ag + profondeur_arbre ad + 1
 profondeur_arbre  (Nombre _ ) =  0
 
-{- retourne le "poids" des opérateurs de l'arbre; pas utilisé dans cette version de l'algo -}
-poids_arbre (Noeud _ ag ad Plus) = 1 + poids_arbre ag + poids_arbre ad
-poids_arbre (Noeud _ ag ad Moins) = 2 + poids_arbre ag + poids_arbre ad
-poids_arbre (Noeud _ ag ad Mult) = 3 + poids_arbre ag + poids_arbre ad
-poids_arbre (Noeud _ ag ad Divi) = 4 + poids_arbre ag + poids_arbre ad
-poids_arbre (Nombre _ ) = 0
-
 instance Show Arbre where 
     show arbre =
         case arbre of 
@@ -112,42 +105,22 @@ algo l prof best_res  cible=
 algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf iOp =
     let val_a = valeur_Noeud iA in
     let val_b = valeur_Noeud iB in
-    if (iOp == 0) then
-      	let my_list=iBase++[(Noeud (val_a+val_b) iA iB Plus)]++iTail in
-	let sol = algo my_list iProf iBest_res iCible in
-	iPred sol (algo2_foreach_op iA iB iBase iTail iPred sol iCible iProf (iOp+1))
-    else 
-        if (iOp == 1) then 
-            let my_list=iBase++[(Noeud (val_a-val_b) iA iB Moins)]++iTail in
-	    let sol = algo my_list iProf iBest_res iCible in
-	    iPred sol (algo2_foreach_op iA iB iBase iTail iPred sol iCible iProf (iOp+1))
-      	else
-            if (iOp == 2) then
-        	let my_list=iBase++[(Noeud (val_a*val_b) iA iB Mult)]++iTail in
-	        let sol = algo my_list iProf iBest_res iCible in
-	        iPred sol (algo2_foreach_op iA iB iBase iTail iPred sol iCible iProf (iOp+1))
-            else
-                if (iOp == 3) then
-      	            if (val_b /= 0  &&  (val_a `mod` val_b) == 0) then
-	                let my_list=iBase++[(Noeud (div val_a val_b) iA iB Divi)]++iTail in
-	                let sol = algo my_list iProf iBest_res iCible in
-	                iPred sol (algo2_foreach_op iA iB iBase iTail iPred sol iCible iProf (iOp+1))
-	            else
-	                algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf (iOp+1)
-                else
-                    if (iOp == 4) then
-      	                let my_list=iBase++[(Noeud (val_b-val_a) iB iA Moins)]++iTail in
-	                let sol = algo my_list iProf iBest_res iCible in
-	                iPred sol (algo2_foreach_op iA iB iBase iTail iPred sol iCible iProf (iOp+1))
-                    else
-                        if (iOp == 5) then
-      	                    if (val_a /= 0 &&  (val_b `mod` val_a) == 0) then
-	  	                let my_list=iBase++[(Noeud (div val_b val_a) iB iA Divi)]++iTail in
-	                        algo my_list iProf iBest_res iCible 		
-	                    else
-	                        iBest_res
-                        else 
-                            iBest_res
+    let next_algo next_noeud iBest_res1 = algo (iBase++[next_noeud]++iTail) iProf iBest_res1 iCible in
+    let sol1 = next_algo (Noeud (val_a+val_b) iA iB Plus) iBest_res in iPred sol1 (
+    let sol2 = next_algo (Noeud (val_a-val_b) iA iB Moins) sol1 in iPred sol2 (
+    let sol3 = next_algo (Noeud (val_a*val_b) iA iB Mult) sol2 in iPred sol3 (
+    let sol4 =                                                                              
+            if (val_b /= 0  &&  (val_a `mod` val_b) == 0) then
+                next_algo (Noeud (div val_a val_b) iA iB Divi) sol3
+	    else
+	        sol3
+            in iPred sol4 (
+    let sol5 = next_algo (Noeud (val_b-val_a) iB iA Moins) sol4 in iPred sol5 (
+      	    if (val_a /= 0 &&  (val_b `mod` val_a) == 0) then
+	  	next_algo (Noeud (div val_b val_a) iB iA Divi) sol5
+	    else
+	        sol5
+    )))))
 
 algo2_foreach_b iA iBase iList iPred iBest_res iCible iProf =
  case iList of
