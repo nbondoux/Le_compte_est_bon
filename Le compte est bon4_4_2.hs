@@ -113,43 +113,34 @@ algo l prof best_res cible future =
 	          algo2 l (prof+1) best_res cible (\sol -> future sol)
  
     
-algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf iOp future =
+algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf future =
     let val_a = valeur_Noeud iA in
     let val_b = valeur_Noeud iB in
-    let next_algo my_list =
-         algo my_list iProf iBest_res iCible (\sol ->
-              iPred sol (algo2_foreach_op iA iB iBase iTail iPred sol iCible iProf (iOp+1)) future)
-    in
-    if (iOp == 0) then
-      	next_algo (iBase++[(Noeud (val_a+val_b) iA iB Plus)]++iTail)
-    else 
-        if (iOp == 1) then 
-            next_algo (iBase++[(Noeud (val_a-val_b) iA iB Moins)]++iTail)
-      	else
-            if (iOp == 2) then
-        	next_algo (iBase++[(Noeud (val_a*val_b) iA iB Mult)]++iTail)
-            else
-                if (iOp == 3) then
-      	            if (val_b /= 0  &&  (val_a `mod` val_b) == 0) then
-                        next_algo (iBase++[(Noeud (div val_a val_b) iA iB Divi)]++iTail)
-	            else
-	                algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf (iOp+1) (\sol -> future sol)
-                else
-                    if (iOp == 4) then
-                        next_algo(iBase++[(Noeud (val_b-val_a) iB iA Moins)]++iTail)
-                    else
-                        if (iOp == 5) then
-      	                    if (val_a /= 0 &&  (val_b `mod` val_a) == 0) then
-	  	                next_algo (iBase++[(Noeud (div val_b val_a) iB iA Divi)]++iTail)
-	                    else
-	                        future (iBest_res)
-                        else 
-                            future (iBest_res)
+    let next_algo next_node iBest_res1 = algo (iBase++[next_node]++iTail) iProf iBest_res1 iCible in
+    
+    next_algo (Noeud (val_a+val_b) iA iB Plus) iBest_res (\sol1 -> iPred sol1 (
+    next_algo (Noeud (val_a-val_b) iA iB Moins) sol1) (\sol2 -> iPred sol2 (
+    next_algo (Noeud (val_a*val_b) iA iB Mult) sol2) (\sol3 ->
+    (
+     if (val_b /= 0  &&  (val_a `mod` val_b) == 0) then
+         iPred sol3 (next_algo (Noeud (div val_a val_b) iA iB Divi) iBest_res)
+     else
+	 (\my_future -> my_future sol3)
+    ) (\sol4 -> iPred sol4 (
+    next_algo (Noeud (val_b-val_a) iB iA Moins) sol4) (\sol5 ->
+     (
+      if (val_a /= 0 &&  (val_b `mod` val_a) == 0) then
+	  next_algo (Noeud (div val_b val_a) iB iA Divi) sol5 future
+      else
+	  future (sol5)
+     )
+    )))))
+                                                     
 
 algo2_foreach_b iA iBase iList iPred iBest_res iCible iProf future =
  case iList of
       b:l -> algo2_foreach_op iA b iBase l iPred iBest_res iCible 
-	     iProf 0 (\sol ->
+	     iProf (\sol ->
 	     iPred sol (algo2_foreach_b iA (iBase++[b]) l iPred sol iCible iProf) future)
       [] -> future iBest_res
 
