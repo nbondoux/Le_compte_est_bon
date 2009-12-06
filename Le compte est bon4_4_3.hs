@@ -3,7 +3,7 @@ module Main where
 {- Le compte est bon ; haskell version
    algo in this version returns a list of solutions from the first found to
    the best one, by using the continuation style (with Cont monads)
-   main function evaluate each elements of the list and display them   
+   main function evaluate each element of the list and display them
  -}
 import IO
 import Control.Monad.Cont
@@ -94,10 +94,10 @@ algo l prof best_res cible iException=
                      algo2_next
                  else
                      if prof+1 == pm then
-                         {- we don't go in next levels; we continue in current one -}
+                         {- we don't go in next levels; but we continue in current one -}
                          return best_res
                      else
-                         {- prof+1 > pm; we quit currrent level-}
+                         {- prof+1 > pm; we quit current level-}
                          iException best_res
              Nothing -> algo2_next
     
@@ -145,7 +145,7 @@ algo2 l iProf iBest_res iCible =
     callCC (\exception -> algo2_foreach_a_b [] l iBest_res iCible iProf exception)
 
 {- algo_launcher :: (Num t, Ord t) => [Arbre] -> Int -> [(Arbre, t)] -}
-algo_launcher l cible = (`runCont` (\_->[])) $ algo l 0 Nothing cible (\_-> (Cont (\_->[])))
+algo_launcher l cible = (`runCont` (\_->[])) $ callCC (\exception -> algo l 0 Nothing cible exception)
 
 le_compte_est_bon liste cible =
     showSolutions (algo_launcher (construct_arbre liste) cible) where
@@ -172,5 +172,4 @@ main=
           message_help progName
        else 
            let intArgs = List.map (\x  -> read x) args in
-           le_compte_est_bon (List.take (longueur -1) intArgs) (List.last intArgs) 
-      
+           le_compte_est_bon (List.take (longueur -1) intArgs) (List.last intArgs)
