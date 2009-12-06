@@ -44,13 +44,6 @@ op_priority (Nombre _ ) = 100
 profondeur_arbre (Noeud _ ag ad _ ) = profondeur_arbre ag + profondeur_arbre ad + 1
 profondeur_arbre  (Nombre _ ) =  0
 
-{- retourne le "poids" des opérateurs de l'arbre; pas utilisé dans cette version de l'algo -}
-poids_arbre (Noeud _ ag ad Plus) = 1 + poids_arbre ag + poids_arbre ad
-poids_arbre (Noeud _ ag ad Moins) = 2 + poids_arbre ag + poids_arbre ad
-poids_arbre (Noeud _ ag ad Mult) = 3 + poids_arbre ag + poids_arbre ad
-poids_arbre (Noeud _ ag ad Divi) = 4 + poids_arbre ag + poids_arbre ad
-poids_arbre (Nombre _ ) = 0
-
 instance Show Arbre where 
     show arbre =
         case arbre of 
@@ -108,46 +101,33 @@ algo l prof best_res cible iException=
                          iException best_res
              Nothing -> algo2_next
     
-algo2_foreach_op iA iB iBase iTail iBest_res iCible iProf iOp iException=
+algo2_foreach_op iA iB iBase iTail iBest_res iCible iProf iException=
     let val_a = valeur_Noeud iA in
     let val_b = valeur_Noeud iB in
-    let next_algo my_list = 
-            (
-             do
-               sol <- algo my_list iProf iBest_res iCible iException
-               algo2_foreach_op iA iB iBase iTail sol iCible iProf (iOp+1) iException
-            )
+    let next_algo new_node iBest_res1 = algo (iBase++[new_node]++iTail) iProf iBest_res1 iCible iException
     in
-    if (iOp == 0) then
-      	next_algo (iBase++[(Noeud (val_a+val_b) iA iB Plus)]++iTail)
-    else 
-        if (iOp == 1) then 
-            next_algo (iBase++[(Noeud (val_a-val_b) iA iB Moins)]++iTail)
-      	else
-            if (iOp == 2) then
-        	next_algo (iBase++[(Noeud (val_a*val_b) iA iB Mult)]++iTail)
-            else
-                if (iOp == 3) then
-      	            if (val_b /= 0  &&  (val_a `mod` val_b) == 0) then
-                        next_algo (iBase++[(Noeud (div val_a val_b) iA iB Divi)]++iTail)
-	            else
-	                algo2_foreach_op iA iB iBase iTail iBest_res iCible iProf (iOp+1) iException
-                else
-                    if (iOp == 4) then
-                        next_algo(iBase++[(Noeud (val_b-val_a) iB iA Moins)]++iTail)
-                    else
-                        if (iOp == 5) then
-      	                    if (val_a /= 0 &&  (val_b `mod` val_a) == 0) then
-	  	                next_algo (iBase++[(Noeud (div val_b val_a) iB iA Divi)]++iTail)
-	                    else
-	                        return iBest_res
-                        else 
-                            return iBest_res
+      do
+        sol1 <-  next_algo (Noeud (val_a+val_b) iA iB Plus) iBest_res
+      	sol2 <-  next_algo (Noeud (val_a-val_b) iA iB Moins) sol1
+      	sol3 <-  next_algo (Noeud (val_a*val_b) iA iB Mult) sol2
+        sol4 <- (
+      	         if (val_b /= 0  &&  (val_a `mod` val_b) == 0) then
+                     next_algo (Noeud (div val_a val_b) iA iB Divi) sol3
+	         else
+                     return sol3
+                )
+        sol5 <- next_algo (Noeud (val_b-val_a) iB iA Moins) sol4
+        (
+         if (val_a /= 0 &&  (val_b `mod` val_a) == 0) then
+	     next_algo (Noeud (div val_b val_a) iB iA Divi) sol5
+	 else
+	     return sol5)
+
 
 algo2_foreach_b iA iBase iList iBest_res iCible iProf iException=
  case iList of
       b:l -> (do
-               sol <- algo2_foreach_op iA b iBase l iBest_res iCible iProf 0 iException
+               sol <- algo2_foreach_op iA b iBase l iBest_res iCible iProf iException
 	       algo2_foreach_b iA (iBase++[b]) l sol iCible iProf iException
              )
       [] -> return iBest_res
@@ -164,11 +144,11 @@ algo2_foreach_a_b iBase iList iBest_res iCible iProf iException=
 algo2 l iProf iBest_res iCible =
     callCC (\exception -> algo2_foreach_a_b [] l iBest_res iCible iProf exception)
 
-{- algo_main :: (Num t, Ord t) => [Arbre] -> Int -> [(Arbre, t)] -}
-algo_main l cible = (`runCont` (\_->[])) $ algo l 0 Nothing cible (\_-> (Cont (\_->[])))
+{- algo_launcher :: (Num t, Ord t) => [Arbre] -> Int -> [(Arbre, t)] -}
+algo_launcher l cible = (`runCont` (\_->[])) $ algo l 0 Nothing cible (\_-> (Cont (\_->[])))
 
 le_compte_est_bon liste cible =
-    showSolutions (algo_main (construct_arbre liste) cible) where
+    showSolutions (algo_launcher (construct_arbre liste) cible) where
         showSolutions ((sol,pr_sol):l) =
             do
               putStr (show cible)
@@ -176,7 +156,7 @@ le_compte_est_bon liste cible =
               showSolutions l
         showSolutions [] =
             do
-              putStr "No more solution\n"
+              putStr "No better solution\n"
 
 message_help iProgName =
     do
