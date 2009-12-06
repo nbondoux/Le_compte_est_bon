@@ -79,53 +79,43 @@ construct_arbre = construct_arbre_rt [] where
 valeur_Noeud (Noeud e _ _ _) = e
 valeur_Noeud (Nombre y) = y 
 
-{- in all these algo* functions, "future" continuation always take as parameter
-   the best solution known -}
-
-algo2_pred prof sol p = 
-    case sol of
-      (Just (_,n_pr))->
-          if prof >= n_pr then
-	      return sol
-	  else
-	      p
-      Nothing -> p
-
 {- algo :: (Num a, Ord a) =>
-        [Arbre] -> a -> Maybe (Arbre, a) -> Int -> Cont [(Arbre, a)] (Maybe (Arbre, a))
+        [Arbre]
+        -> a
+        -> Maybe (Arbre, a)
+        -> Int
+        -> (Maybe (Arbre, a) -> Cont [(Arbre, a)] (Maybe (Arbre, a)))
+        -> Cont [(Arbre, a)] (Maybe (Arbre, a))
 -}
 
-algo l prof best_res cible =
-  let length_is_one [_] = True 
-      length_is_one _ = False
-  in
-    case find (\x -> valeur_Noeud x == cible) l of
-      Just sol ->
-          let profa = profondeur_arbre sol in
-	  Cont$ \k -> (sol,profa):(k (Just (sol,profa)))
-      Nothing ->
-	case best_res of
-	  Just (_,pm) ->
-	      if prof >= pm - 1 || length_is_one l  then
-		  return best_res
-	      else
-                  algo2 l (prof+1) best_res cible
-	      
-	  Nothing -> 
-	      if length_is_one l  then
-	          return best_res
-	      else
-	          algo2 l (prof+1) best_res cible
- 
+algo l prof best_res cible iException=
+     case find (\x -> valeur_Noeud x == cible) l of
+       Just sol ->
+           let profa = profondeur_arbre sol in
+           Cont$ \k -> (sol,profa):(runCont (iException (Just (sol,profa))) k)
+       Nothing ->
+           let algo2_next = algo2 l (prof+1) best_res cible in
+           case best_res of
+	     Just (_,pm) ->
+                 if prof + 1 < pm then
+                     algo2_next
+                 else
+                     if prof+1 == pm then
+                         {- we don't go in next levels; we continue in current one -}
+                         return best_res
+                     else
+                         {- prof+1 > pm; we quit currrent level-}
+                         iException best_res
+             Nothing -> algo2_next
     
-algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf iOp =
+algo2_foreach_op iA iB iBase iTail iBest_res iCible iProf iOp iException=
     let val_a = valeur_Noeud iA in
     let val_b = valeur_Noeud iB in
     let next_algo my_list = 
             (
              do
-               sol <- algo my_list iProf iBest_res iCible
-               iPred sol (algo2_foreach_op iA iB iBase iTail iPred sol iCible iProf (iOp+1))
+               sol <- algo my_list iProf iBest_res iCible iException
+               algo2_foreach_op iA iB iBase iTail sol iCible iProf (iOp+1) iException
             )
     in
     if (iOp == 0) then
@@ -141,7 +131,7 @@ algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf iOp =
       	            if (val_b /= 0  &&  (val_a `mod` val_b) == 0) then
                         next_algo (iBase++[(Noeud (div val_a val_b) iA iB Divi)]++iTail)
 	            else
-	                algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf (iOp+1)
+	                algo2_foreach_op iA iB iBase iTail iBest_res iCible iProf (iOp+1) iException
                 else
                     if (iOp == 4) then
                         next_algo(iBase++[(Noeud (val_b-val_a) iB iA Moins)]++iTail)
@@ -154,28 +144,28 @@ algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf iOp =
                         else 
                             return iBest_res
 
-algo2_foreach_b iA iBase iList iPred iBest_res iCible iProf =
+algo2_foreach_b iA iBase iList iBest_res iCible iProf iException=
  case iList of
       b:l -> (do
-               sol <- algo2_foreach_op iA b iBase l iPred iBest_res iCible iProf 0 
-	       iPred sol (algo2_foreach_b iA (iBase++[b]) l iPred sol iCible iProf)
+               sol <- algo2_foreach_op iA b iBase l iBest_res iCible iProf 0 iException
+	       algo2_foreach_b iA (iBase++[b]) l sol iCible iProf iException
              )
       [] -> return iBest_res
             
 
-algo2_foreach_a_b iBase iList iPred iBest_res iCible iProf =
+algo2_foreach_a_b iBase iList iBest_res iCible iProf iException=
   case iList of
     a:l -> (do
-             sol <- algo2_foreach_b a iBase l iPred iBest_res iCible iProf
-	     iPred sol (algo2_foreach_a_b (iBase++[a]) l iPred sol iCible iProf)
+             sol <- algo2_foreach_b a iBase l iBest_res iCible iProf iException
+	     algo2_foreach_a_b (iBase++[a]) l sol iCible iProf iException
            )
     [] -> return iBest_res
 
 algo2 l iProf iBest_res iCible =
-    algo2_foreach_a_b [] l (algo2_pred iProf) iBest_res iCible iProf
+    callCC (\exception -> algo2_foreach_a_b [] l iBest_res iCible iProf exception)
 
 {- algo_main :: (Num t, Ord t) => [Arbre] -> Int -> [(Arbre, t)] -}
-algo_main l cible = (`runCont` (\_->[])) $ algo l 0 Nothing cible
+algo_main l cible = (`runCont` (\_->[])) $ algo l 0 Nothing cible (\_-> (Cont (\_->[])))
 
 le_compte_est_bon liste cible =
     showSolutions (algo_main (construct_arbre liste) cible) where
