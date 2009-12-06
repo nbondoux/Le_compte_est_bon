@@ -120,20 +120,20 @@ algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf future =
     
     next_algo (Noeud (val_a+val_b) iA iB Plus) iBest_res (\sol1 -> iPred sol1 (
     next_algo (Noeud (val_a-val_b) iA iB Moins) sol1) (\sol2 -> iPred sol2 (
-    next_algo (Noeud (val_a*val_b) iA iB Mult) sol2) (\sol3 ->
+    next_algo (Noeud (val_a*val_b) iA iB Mult) sol2) (\sol3 -> iPred sol3 (
     (
      if (val_b /= 0  &&  (val_a `mod` val_b) == 0) then
-         iPred sol3 (next_algo (Noeud (div val_a val_b) iA iB Divi) iBest_res)
+         next_algo (Noeud (div val_a val_b) iA iB Divi) iBest_res
      else
-	 (\my_future -> my_future sol3)
-    ) (\sol4 -> iPred sol4 (
-    next_algo (Noeud (val_b-val_a) iB iA Moins) sol4) (\sol5 ->
+	 \my_future -> my_future sol3
+    )) (\sol4 -> iPred sol4 (
+    next_algo (Noeud (val_b-val_a) iB iA Moins) sol4) (\sol5 -> iPred sol5 (
      (
       if (val_a /= 0 &&  (val_b `mod` val_a) == 0) then
-	  next_algo (Noeud (div val_b val_a) iB iA Divi) sol5 future
+	  next_algo (Noeud (div val_b val_a) iB iA Divi) sol5
       else
-	  future (sol5)
-     )
+	  \my_future -> my_future sol5
+     )) future
     )))))
                                                      
 
