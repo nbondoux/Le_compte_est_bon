@@ -175,7 +175,7 @@ le_compte_est_bon liste cible =
               showSolutions l
         showSolutions [] =
             do
-              putStr "No more solution\n"
+              putStr "No better solution\n"
 
 message_help iProgName =
     do

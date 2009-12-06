@@ -142,7 +142,7 @@ le_compte_est_bon liste cible =
                      {-"uncomment this if you want to display all the solutions showSolutions l -}
         showSolutions [] =
             do
-              putStr "No more solution\n"
+              putStr "No better solution\n"
         
                      
 message_help iProgName =
