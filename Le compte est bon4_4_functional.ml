@@ -80,14 +80,14 @@ match x with
 
 
 
-let algo2_pred prof sol =
+let algo2_pred prof sol p =
   match sol  with
       BestArbre (_,n_pr)->
-	if prof >= n_pr then
-	  true
+	if prof < n_pr then
+	  p
 	else
-	  false
-    |_ -> false ;;
+	  sol
+    |_ -> p ;;
 
 
 
@@ -124,97 +124,40 @@ let rec algo l prof best_res  cible=
       )
 and
 
- algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf iOp =
+ algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf =
   let val_a = valeur_Noeud iA in
   let val_b = valeur_Noeud iB in
-    
-    if (iOp = 0) then
-      (
-	let my_list=iBase@[Noeud(val_a+val_b,iA,iB,Plus)]@iTail in
-	let sol = algo my_list iProf iBest_res iCible in
-	  if iPred sol then
-	    sol
-	  else 
-	    algo2_foreach_op iA iB iBase iTail iPred sol iCible iProf (iOp+1)
-      )
-	
-    else if (iOp = 1) then 
-      (
-	let my_list=iBase@[Noeud(val_a-val_b,iA,iB,Moins)]@iTail in
-	let sol = algo my_list iProf iBest_res iCible in
-	  if iPred sol then
-	    sol
-	  else 
-	    algo2_foreach_op iA iB iBase iTail iPred sol iCible iProf (iOp+1)
-      )
-	
-    else if (iOp = 2) then
-      (
-	let my_list=iBase@[Noeud(val_a*val_b,iA,iB,Mult)]@iTail in
-	let sol = algo my_list iProf iBest_res iCible in
-	  if iPred sol then
-	    sol
-	  else 
-	    algo2_foreach_op iA iB iBase iTail iPred sol iCible iProf (iOp+1)
-      )
-    else if (iOp = 3) then
-      (
-	if (val_b <> 0  &&  (val_a mod val_b) = 0) then
-	  (
-	    let my_list=iBase@[Noeud(val_a/val_b,iA,iB,Divi)]@iTail in
-	    let sol = algo my_list iProf iBest_res iCible in
-	      if iPred sol then
-		sol
-	      else 
-		algo2_foreach_op iA iB iBase iTail iPred sol iCible iProf (iOp+1)
-	  )
-	else
-	  algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf (iOp+1)
-      )
-    else if (iOp = 4) then
-      (
-	let my_list=iBase@[Noeud(val_b-val_a,iB,iA,Moins)]@iTail in
-	let sol = algo my_list iProf iBest_res iCible in
-	  if iPred sol then
-	    sol
-	  else 
-	    algo2_foreach_op iA iB iBase iTail iPred sol iCible iProf (iOp+1)
-      )
-    else if (iOp = 5) then
-      (
-	if (val_a <> 0 &&  (val_b mod val_a) = 0) then
-	  (
-	    let my_list=iBase@[Noeud(val_b/val_a,iB,iA,Divi)]@iTail in
-	      algo my_list iProf iBest_res iCible 
-		
-	  )
-	else
-	  iBest_res
-      )
-
+  let new_tail = iBase@iTail in
+  let next_algo next_node sol = algo (next_node::new_tail) iProf sol iCible in
+  let sol1 = next_algo (Noeud(val_a+val_b,iA,iB,Plus)) iBest_res in iPred sol1 (
+  let sol2 = next_algo (Noeud(val_a-val_b,iA,iB,Moins)) sol1 in iPred sol2 (
+  let sol3 = next_algo (Noeud(val_a*val_b,iA,iB,Mult)) sol2 in iPred sol3 (
+  let sol4 = (
+    if (val_b <> 0  &&  (val_a mod val_b) = 0) then
+      next_algo (Noeud(val_a/val_b,iA,iB,Divi)) sol3
     else 
-      iBest_res
-
+      sol3
+  ) in iPred sol4 (
+  let sol5 = next_algo (Noeud(val_b-val_a,iB,iA,Moins)) sol4 in iPred sol5 (
+      if (val_a <> 0 &&  (val_b mod val_a) = 0) then
+	next_algo (Noeud(val_b/val_a,iB,iA,Divi)) sol5
+      else
+        sol5
+    )))))
 and 
 
  algo2_foreach_b iA iBase iList iPred iBest_res iCible iProf =
   match iList with
       b::l -> let sol = (algo2_foreach_op iA b iBase l iPred iBest_res iCible 
-			iProf 0)
-	in if iPred sol then
-	    sol
-	  else
-	    (algo2_foreach_b iA (iBase@[b]) l iPred sol iCible iProf)
+			iProf)
+	in iPred sol (algo2_foreach_b iA (b::iBase) l iPred sol iCible iProf)
     |[] -> iBest_res
 
 and 
  algo2_foreach_a_b iBase iList iPred iBest_res iCible iProf=
   match iList with
       a::l -> let sol = (algo2_foreach_b a iBase l iPred iBest_res iCible iProf) in
-		if iPred sol then
-		  sol
-		else
-		  (algo2_foreach_a_b (iBase@[a]) l iPred sol iCible iProf)
+	iPred sol (algo2_foreach_a_b (a::iBase) l iPred sol iCible iProf)
     |[] -> iBest_res
 
 and 
