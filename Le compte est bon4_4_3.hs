@@ -87,18 +87,13 @@ algo l prof best_res cible iException=
            let profa = profondeur_arbre sol in
            Cont$ \k -> (sol,profa):(runCont (iException (Just (sol,profa))) k)
        Nothing ->
-           let algo2_next = algo2 l (prof+1) best_res cible in
+           let algo2_next = algo2 l (prof+1) best_res cible iException in
            case best_res of
 	     Just (_,pm) ->
                  if prof + 1 < pm then
                      algo2_next
-                 else
-                     if prof+1 == pm then
-                         {- we don't go in next levels; but we continue in current one -}
-                         return best_res
-                     else
-                         {- prof+1 > pm; we quit current level-}
-                         iException best_res
+                 else {- we don't go in next levels; but we continue in current one -}
+                     return best_res
              Nothing -> algo2_next
     
 algo2_foreach_op iA iB iBase iTail iBest_res iCible iProf iException=
@@ -141,8 +136,32 @@ algo2_foreach_a_b iBase iList iBest_res iCible iProf iException=
            )
     [] -> return iBest_res
 
-algo2 l iProf iBest_res iCible =
-    callCC (\exception -> algo2_foreach_a_b [] l iBest_res iCible iProf exception)
+algo2 l iProf iBest_res iCible iException =
+{- a small explaination:
+   exception2 is called when algo2_foreach_a_b did not call is "exception"
+   parameter; it will lead to the normal continuation of algo2
+   when exception is called, we are leaving current level; we compare the best
+   solution found with the level below; if the level below is higher, we escape
+   to the exit the the level below (to make short, we rethrow the exception
+   if needed)
+-}
+      callCC (\exception2 ->
+              do
+                sol1 <- callCC (\exception -> 
+                                    do
+                                      sol2 <-algo2_foreach_a_b [] l iBest_res iCible iProf exception
+                                      exception2 (sol2)
+                               )
+                ({- we know that exception was called, because exception2 would
+                    have made us jump this code -}
+                 case sol1 of
+	           Just (_,pm) ->
+                       if pm + 1 < iProf then
+                           iException sol1
+                       else
+                           return sol1
+                   Nothing -> return sol1))
+                
 
 {- algo_launcher :: (Num t, Ord t) => [Arbre] -> Int -> [(Arbre, t)] -}
 algo_launcher l cible = (`runCont` (\_->[])) $ callCC (\exception -> algo l 0 Nothing cible exception)
