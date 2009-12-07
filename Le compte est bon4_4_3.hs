@@ -137,7 +137,7 @@ algo2_foreach_a_b iBase iList iBest_res iCible iProf iException=
     [] -> return iBest_res
 
 algo2 l iProf iBest_res iCible iException =
-{- a small explaination:
+{- a small explanation:
    exception2 is called when algo2_foreach_a_b did not call is "exception"
    parameter; it will lead to the normal continuation of algo2
    when exception is called, we are leaving current level; we compare the best
