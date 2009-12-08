@@ -156,7 +156,7 @@ algo2 l iProf iBest_res iCible iException =
                     have made us jump this code -}
                  case sol1 of
 	           Just (_,pm) ->
-                       if pm + 1 < iProf then
+                       if pm + 1 <= iProf then
                            iException sol1
                        else
                            return sol1
