@@ -81,7 +81,7 @@ valeur_Noeud (Nombre y) = y
 
 
 
-algo2_pred prof sol p = 
+algo2_pred prof = \sol p ->
     case sol of 
       (Just (_,n_pr))->
           if  prof >= n_pr then

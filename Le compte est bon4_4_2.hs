@@ -81,43 +81,36 @@ valeur_Noeud (Nombre y) = y
 {- in all these algo* functions, "future" continuation always take as parameter
    the best solution known -}
 
-algo2_pred prof sol p future = 
+algo2_pred prof sol p = 
     case sol of 
       (Just (_,n_pr))->
           if prof >= n_pr then
-	      future sol
+	      \future -> future sol
 	  else
-	      p (\new_sol -> future new_sol)
-      Nothing -> p (\new_sol -> future new_sol)
+	      \future -> p (\new_sol -> future new_sol)
+      Nothing -> \future -> p (\new_sol -> future new_sol)
 
-algo l prof best_res cible future =
-  let length_is_one [_] = True 
-      length_is_one _ = False
-  in
+algo l prof best_res cible =
     case find (\x -> valeur_Noeud x == cible) l of
       Just sol ->
           let profa = profondeur_arbre sol in 
-	  (sol,profa):future (Just (sol,profa))
+	  \future -> (sol,profa):future (Just (sol,profa))
       Nothing ->
 	case best_res of
 	  Just (_,pm) ->
-	      if prof >= pm - 1 || length_is_one l  then
-		  future best_res
+	      if prof + 1  >= pm  then
+		  \future -> future best_res
 	      else
-		  algo2 l (prof+1) best_res cible (\sol -> future sol)
+		  \future -> algo2 l (prof+1) best_res cible (\sol -> future sol)
 	      
-	  Nothing -> 
-	      if length_is_one l  then
-	          future best_res
-	      else
-	          algo2 l (prof+1) best_res cible (\sol -> future sol)
+	  Nothing -> \future -> algo2 l (prof+1) best_res cible (\sol -> future sol)
  
     
-algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf future =
+algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf =
     let val_a = valeur_Noeud iA in
     let val_b = valeur_Noeud iB in
     let next_algo next_node iBest_res1 = algo (iBase++[next_node]++iTail) iProf iBest_res1 iCible in
-    
+    \future ->
     next_algo (Noeud (val_a+val_b) iA iB Plus) iBest_res (\sol1 -> iPred sol1 (
     next_algo (Noeud (val_a-val_b) iA iB Moins) sol1) (\sol2 -> iPred sol2 (
     next_algo (Noeud (val_a*val_b) iA iB Mult) sol2) (\sol3 -> iPred sol3 (
@@ -137,22 +130,22 @@ algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf future =
     )))))
                                                      
 
-algo2_foreach_b iA iBase iList iPred iBest_res iCible iProf future =
+algo2_foreach_b iA iBase iList iPred iBest_res iCible iProf  =
  case iList of
-      b:l -> algo2_foreach_op iA b iBase l iPred iBest_res iCible 
+      b:l -> \future -> algo2_foreach_op iA b iBase l iPred iBest_res iCible 
 	     iProf (\sol ->
 	     iPred sol (algo2_foreach_b iA (iBase++[b]) l iPred sol iCible iProf) future)
-      [] -> future iBest_res
+      [] -> \future -> future iBest_res
 
-algo2_foreach_a_b iBase iList iPred iBest_res iCible iProf future=
+algo2_foreach_a_b iBase iList iPred iBest_res iCible iProf =
   case iList of
-      a:l -> algo2_foreach_b a iBase l iPred iBest_res iCible iProf (\sol ->
+      a:l -> \future -> algo2_foreach_b a iBase l iPred iBest_res iCible iProf (\sol ->
 	     iPred sol (algo2_foreach_a_b (iBase++[a]) l iPred sol iCible iProf)
              future)
-      [] -> future iBest_res
+      [] -> \future -> future iBest_res
 
-algo2 l iProf iBest_res iCible future =
-  algo2_foreach_a_b [] l (algo2_pred iProf) iBest_res iCible iProf (\sol -> future (sol))
+algo2 l iProf iBest_res iCible  =
+    \future -> algo2_foreach_a_b [] l (algo2_pred iProf) iBest_res iCible iProf (\sol -> future (sol))
 
 {- algo_main :: (Num t, Ord t) => [Arbre] -> Int -> [(Arbre, t)] -}
 algo_main l cible = algo l 0 Nothing cible (\_->[])
