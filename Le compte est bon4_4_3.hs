@@ -4,7 +4,9 @@ module Main where
    algo in this version returns a list of solutions from the first found to
    the best one, by using the continuation style (with Cont monads)
    main function evaluate each element of the list and display them
- -}
+ 
+   only accept positive numbers in input
+-}
 import IO
 import Control.Monad.Cont
 import System
@@ -103,20 +105,29 @@ algo2_foreach_op iA iB iBase iTail iBest_res iCible iProf iException=
     in
       do
         sol1 <-  next_algo (Noeud (val_a+val_b) iA iB Plus) iBest_res
-      	sol2 <-  next_algo (Noeud (val_a-val_b) iA iB Moins) sol1
-      	sol3 <-  next_algo (Noeud (val_a*val_b) iA iB Mult) sol2
+      	sol2 <-  (
+                   if (val_a > val_b) then
+                     next_algo (Noeud (val_a-val_b) iA iB Moins) sol1
+                   else
+                     next_algo (Noeud (val_b-val_a) iB iA Moins) sol1
+                 )
+      	sol3 <-  (
+                  if (val_a /= 1 && val_b /=1) then
+                    next_algo (Noeud (val_a*val_b) iA iB Mult) sol2
+                  else
+                    return sol2
+                 )        
         sol4 <- (
-      	         if (val_b /= 0  &&  (val_a `mod` val_b) == 0) then
+      	         if (val_b > 1  &&  (val_a `mod` val_b) == 0) then
                      next_algo (Noeud (div val_a val_b) iA iB Divi) sol3
 	         else
                      return sol3
                 )
-        sol5 <- next_algo (Noeud (val_b-val_a) iB iA Moins) sol4
         (
-         if (val_a /= 0 &&  (val_b `mod` val_a) == 0) then
-	     next_algo (Noeud (div val_b val_a) iB iA Divi) sol5
+         if (val_a > 1 &&  (val_b `mod` val_a) == 0) then
+	     next_algo (Noeud (div val_b val_a) iB iA Divi) sol4
 	 else
-	     return sol5)
+	     return sol4)
 
 
 algo2_foreach_b iA iBase iList iBest_res iCible iProf iException=
@@ -190,5 +201,11 @@ main=
       if (longueur <2 || (List.elem "-h" args) || (List.elem "--help" args)) then 
           message_help progName
        else 
-           let intArgs = List.map (\x  -> read x) args in
+           let intArgs = List.map (\x  -> 
+                                    let i = read x in 
+                                    if i >= 0 then 
+                                      i 
+                                    else 
+                                      error "error: Input numbers cannot be negative"
+                                  ) args in
            le_compte_est_bon (List.take (longueur -1) intArgs) (List.last intArgs)

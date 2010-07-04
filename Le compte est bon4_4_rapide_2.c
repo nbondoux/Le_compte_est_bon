@@ -4,13 +4,15 @@
 
 /* version recursive rapide (conversion en c); donne une solution avec la profondeur minimum ; affiche les résultats intermédiaires; 
    nombre de malloc fait optimise
+
+   only accept positive numbers in input
 */
 
 struct struct_arbre {
   union {
-    int Nombre;
+    unsigned int Nombre;
     struct { 
-      int valeur;
+      unsigned int valeur;
       struct struct_arbre * ag;
       struct struct_arbre * ad;
       enum {Plus, Moins, Mult, Divi}  op;
@@ -90,11 +92,11 @@ void pool_delete(malloc_arbre_pool* p) {
   free(p->arbre_pool);
 }
 
-arbre ** pool_get_arbretable(malloc_arbre_pool* p, unsigned int pr) {
+inline arbre ** pool_get_arbretable(malloc_arbre_pool* p, unsigned int pr) {
   return p->arbret_pool[pr-1];
 }
 
-arbre * pool_get_arbre(malloc_arbre_pool* p, unsigned int pr) {
+inline arbre * pool_get_arbre(malloc_arbre_pool* p, unsigned int pr) {
   return p->arbre_pool[pr-1];
 }
 
@@ -102,7 +104,6 @@ arbre * pool_get_arbre(malloc_arbre_pool* p, unsigned int pr) {
 
 typedef struct {
   int SolNull ; //= 1 si la solution est null
-  unsigned int solId ; //unique id to see if two solutions are distincts
   struct {
     arbre *a;
     unsigned int pr;
@@ -169,7 +170,7 @@ char * string_arbre (arbre * a) {
     free(c2);
   } else {
     char n[500];
-    sprintf(n,"%d",a->u.Nombre);
+    sprintf(n,"%u",a->u.Nombre);
     c = (char *) malloc (sizeof(char) * (strlen(n) + 1));
     strcpy(c,n);
   }
@@ -177,7 +178,7 @@ char * string_arbre (arbre * a) {
 }
 
 /*malloc une table d'arbres, à partir du tableau d'entiers l, de longueur n */
-arbre ** construct_arbre(int * l, unsigned int n) {
+arbre ** construct_arbre(unsigned int * l, unsigned int n) {
   unsigned int i;
   arbre ** a;
   a= (arbre **) malloc (sizeof(arbre *)* n);
@@ -190,7 +191,7 @@ arbre ** construct_arbre(int * l, unsigned int n) {
   return a;
 }
 
-inline int valeur_Noeud (arbre * a) {
+inline unsigned int valeur_Noeud (arbre * a) {
   if(a->type==Noeud) {
     return a->u.Noeud.valeur;
   } else {
@@ -222,7 +223,6 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
     best_res->BestArbre.a=clone_arbre(l[i]);
     best_res->BestArbre.pr=profa;
     best_res->SolNull=0;
-    ++best_res->solId;
     return ;
   } else {
     if(!best_res->SolNull) {
@@ -282,52 +282,53 @@ void algo2 (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best
       nouv[a]->u.Noeud.ad = l[b];
       nouv[a]->u.Noeud.op = Plus;
       {
-        unsigned int oldSolId = best_res->solId;
         algo(nouv,taille_l - 1, prof, best_res, cible,p);
         
-        if (best_res->solId != oldSolId) {
-          if(prof >= best_res->BestArbre.pr) {
-            exception=1;
-            break;
-          }
+        if (best_res->SolNull == 0 && prof >= best_res->BestArbre.pr) {
+          exception=1;
+          break;
         }
-      }
-      nouv[a] = pool_get_arbre(p,prof);
-      nouv[a]->type=Noeud;
-      nouv[a]->u.Noeud.valeur=val_a - val_b;
-      nouv[a]->u.Noeud.ag = l[a];
-      nouv[a]->u.Noeud.ad = l[b];
-      nouv[a]->u.Noeud.op = Moins;
-      {
-        unsigned int oldSolId = best_res->solId;
-        algo(nouv,taille_l - 1, prof, best_res, cible,p);
-        
-        if(best_res->solId != oldSolId) {
-          if(prof >= best_res->BestArbre.pr) {
-            exception=1;
-            break;
-          }
-        }
-      }
-      
-      nouv[a] = pool_get_arbre(p,prof);
-      nouv[a]->type=Noeud;
-      nouv[a]->u.Noeud.valeur=val_a * val_b;
-      nouv[a]->u.Noeud.ag = l[a];
-      nouv[a]->u.Noeud.ad = l[b];
-      nouv[a]->u.Noeud.op = Mult;
-      {
-        unsigned int oldSolId = best_res->solId;
-        algo(nouv,taille_l - 1, prof, best_res, cible,p);
-        if(best_res->solId != oldSolId) {
-          if(prof >= best_res->BestArbre.pr) {
-            exception=1;
-            break;
-          }
-        }            
       }
 
-      if(val_b != 0 && (val_a % val_b) == 0) {
+      nouv[a] = pool_get_arbre(p,prof);
+      nouv[a]->type=Noeud;
+      if (val_a > val_b) {
+        nouv[a]->u.Noeud.valeur=val_a - val_b;
+        nouv[a]->u.Noeud.ag = l[a];
+        nouv[a]->u.Noeud.ad = l[b];
+      } else {
+        nouv[a]->u.Noeud.valeur=val_b - val_a;
+        nouv[a]->u.Noeud.ag = l[b];
+        nouv[a]->u.Noeud.ad = l[a];
+      }    
+      nouv[a]->u.Noeud.op = Moins;
+      {
+        algo(nouv,taille_l - 1, prof, best_res, cible,p);
+        
+        if(best_res->SolNull == 0 && prof >= best_res->BestArbre.pr) {
+          exception=1;
+          break;
+        }
+      }        
+
+      if (val_a != 1 && val_b != 1) {
+        nouv[a] = pool_get_arbre(p,prof);
+        nouv[a]->type=Noeud;
+        nouv[a]->u.Noeud.valeur=val_a * val_b;
+        nouv[a]->u.Noeud.ag = l[a];
+        nouv[a]->u.Noeud.ad = l[b];
+        nouv[a]->u.Noeud.op = Mult;
+        {
+          algo(nouv,taille_l - 1, prof, best_res, cible,p);
+
+          if(best_res->SolNull == 0 && prof >= best_res->BestArbre.pr) {
+            exception=1;
+            break;
+          }            
+        }
+      }
+
+      if(val_b > 1 && (val_a % val_b) == 0) {
         nouv[a] = pool_get_arbre(p,prof);
         nouv[a]->type=Noeud;
         nouv[a]->u.Noeud.valeur=val_a / val_b;
@@ -335,37 +336,31 @@ void algo2 (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best
         nouv[a]->u.Noeud.ad = l[b];
         nouv[a]->u.Noeud.op = Divi;
         {
-          unsigned int oldSolId = best_res->solId;
           algo(nouv,taille_l - 1, prof, best_res, cible,p);
           
-          if(best_res->solId != oldSolId) {
-            if(prof >= best_res->BestArbre.pr) {
-              exception=1;
-              break;
-            }
-          }
-        }
-      }
-      
-            nouv[a] = pool_get_arbre(p,prof);
-      nouv[a]->type=Noeud;
-      nouv[a]->u.Noeud.valeur=val_b - val_a;
-      nouv[a]->u.Noeud.ag = l[b];
-      nouv[a]->u.Noeud.ad = l[a];
-      nouv[a]->u.Noeud.op = Moins;
-      {
-        unsigned int oldSolId = best_res->solId;
-        algo(nouv,taille_l - 1, prof, best_res, cible,p);
-        
-        if(best_res->solId != oldSolId) {
-          if(prof >= best_res->BestArbre.pr) {
+          if(best_res->SolNull == 0 && prof >= best_res->BestArbre.pr) {
             exception=1;
             break;
           }
         }
       }
       
-      if(val_a != 0 && (val_b % val_a) == 0) {
+      nouv[a] = pool_get_arbre(p,prof);
+      nouv[a]->type=Noeud;
+      nouv[a]->u.Noeud.valeur=val_b - val_a;
+      nouv[a]->u.Noeud.ag = l[b];
+      nouv[a]->u.Noeud.ad = l[a];
+      nouv[a]->u.Noeud.op = Moins;
+      {
+        algo(nouv,taille_l - 1, prof, best_res, cible,p);
+        
+        if(best_res->SolNull == 0 && prof >= best_res->BestArbre.pr) {
+          exception=1;
+          break;         
+        }
+      }
+      
+      if(val_a > 1 && (val_b % val_a) == 0) {
         nouv[a] = pool_get_arbre(p,prof);
         nouv[a]->type=Noeud;
         nouv[a]->u.Noeud.valeur=val_b / val_a;
@@ -373,14 +368,11 @@ void algo2 (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best
         nouv[a]->u.Noeud.ad = l[a];
         nouv[a]->u.Noeud.op = Divi;
         {
-          unsigned int oldSolId = best_res->solId;
           algo(nouv,taille_l - 1, prof, best_res, cible,p);
               
-          if(best_res->solId != oldSolId) {
-            if(prof >= best_res->BestArbre.pr) {
-              exception=1;
-              break;
-            }
+          if(best_res->SolNull == 0 && prof >= best_res->BestArbre.pr) {
+            exception=1;
+            break;
           }
         }
       }
@@ -389,14 +381,13 @@ void algo2 (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best
   return;
 }
 
-void le_compte_est_bon (int * liste, unsigned int liste_n, int cible)  {
+void le_compte_est_bon (unsigned int * liste, unsigned int liste_n, unsigned int cible)  {
   arbre ** liste_a;
   char * c;
   unsigned int i;
 
   solution res;
   res.SolNull=1;
-  res.solId=0;
 
   malloc_arbre_pool p;
   
@@ -428,8 +419,8 @@ void message_help(char * prog) {
                  
 int main( int argc, char ** argv) {
   int i;
-  int * liste;
-  int t,cible;
+  unsigned int * liste;
+  unsigned int t,cible;
 
   for(i=0;i<argc;i++)
     if(!strcmp(argv[i],"-h")) {
@@ -441,9 +432,9 @@ int main( int argc, char ** argv) {
     message_help(argv[0]);
     return 1;
   } else {
-    liste = (int*) malloc (sizeof(int) * (argc - 2));
+    liste = (unsigned int*) malloc (sizeof(unsigned int) * (argc - 2));
     for(i=1;i<argc - 1 ;i++) {
-      if(sscanf(argv[i],"%d",&t) != 1) {
+      if(sscanf(argv[i],"%u",&t) != 1) {
         message_help(argv[0]);
         return 1;
       } else {
@@ -451,7 +442,7 @@ int main( int argc, char ** argv) {
       }
     }
     
-    if(sscanf(argv[argc-1],"%d",&cible) != 1) {
+    if(sscanf(argv[argc-1],"%u",&cible) != 1) {
       message_help(argv[0]);
       return 1;
     }
