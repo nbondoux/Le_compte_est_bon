@@ -27,12 +27,12 @@ Le\ compte\ est\ bon4_4:Le\ compte\ est\ bon4_4.ml
 	ocamlopt Le\ compte\ est\ bon4_4.ml -o Le\ compte\ est\ bon4_4
 
 Le\ compte\ est\ bon4_4_c:Le\ compte\ est\ bon4_4.c
-	gcc -O3 -Wall -o  Le\ compte\ est\ bon4_4_c  Le\ compte\ est\ bon4_4.c
+	gcc -O3 -march=native -Wall -o  Le\ compte\ est\ bon4_4_c  Le\ compte\ est\ bon4_4.c
 
 Le\ compte\ est\ bon4_4_c_rapide:Le\ compte\ est\ bon4_4_rapide.c
-	gcc -O3 -Wall -o Le\ compte\ est\ bon4_4_c_rapide Le\ compte\ est\ bon4_4_rapide.c
+	gcc -O3 -march=native -Wall -o Le\ compte\ est\ bon4_4_c_rapide Le\ compte\ est\ bon4_4_rapide.c
 Le\ compte\ est\ bon4_4_c_rapide_2:Le\ compte\ est\ bon4_4_rapide_2.c
-	gcc -O3 -Wall -o Le\ compte\ est\ bon4_4_c_rapide_2 Le\ compte\ est\ bon4_4_rapide_2.c
+	gcc -std=c99 -O3 -march=native -Wall -o Le\ compte\ est\ bon4_4_c_rapide_2 Le\ compte\ est\ bon4_4_rapide_2.c
 
 Le\ compte\ est\ bon4_4_gmp:Le\ compte\ est\ bon4_4_gmp.ml
 	ocamlfind ocamlopt -package gmp -linkpkg Le\ compte\ est\ bon4_4_gmp.ml -o Le\ compte\ est\ bon4_4_gmp

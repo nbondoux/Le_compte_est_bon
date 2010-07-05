@@ -65,7 +65,6 @@ void rm_arbre(arbre * a) {
 
 typedef struct {
   arbre ** arbre_pool;
-  arbre *** arbret_pool;
   unsigned int prof_max;
 } malloc_arbre_pool;
 
@@ -74,10 +73,8 @@ void pool_create(malloc_arbre_pool* p, unsigned int n_input) {
   p->prof_max=n_input-1;
   
   p->arbre_pool=(arbre **) malloc(sizeof(arbre*) *(n_input-1));
-  p->arbret_pool=(arbre ***) malloc(sizeof(arbre **) *(n_input-1));
   
   for(i=1;i<n_input;i++) {
-    p->arbret_pool[i-1]=(arbre **) malloc (sizeof(arbre *)*(n_input-i));
     p->arbre_pool[i-1]=create_arbreElem();
   }
 }
@@ -86,14 +83,8 @@ void pool_delete(malloc_arbre_pool* p) {
   unsigned int i;
   for(i=1;i<=p->prof_max;i++) {
     free(p->arbre_pool[i-1]);
-    free(p->arbret_pool[i-1]);
   }
-  free(p->arbret_pool);
   free(p->arbre_pool);
-}
-
-inline arbre ** pool_get_arbretable(malloc_arbre_pool* p, unsigned int pr) {
-  return p->arbret_pool[pr-1];
 }
 
 inline arbre * pool_get_arbre(malloc_arbre_pool* p, unsigned int pr) {
@@ -200,183 +191,127 @@ inline unsigned int valeur_Noeud (arbre * a) {
 }
 
 
-void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_res, int cible, malloc_arbre_pool* p);
-void algo2 (arbre ** l,unsigned int taille_l, unsigned int prof, solution*  best_res, int cible, malloc_arbre_pool* p);
+void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_res, int cible, arbre * last_computed_tree, malloc_arbre_pool* p) {
 
-
-void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_res, int cible, malloc_arbre_pool* p) {
   unsigned int i=0;
   unsigned int profa;
   char * c;
-  while (i< taille_l && valeur_Noeud(l[i]) != cible) {
-    i++;
+  
+  unsigned int is_sol_found = 0;
+  arbre * sol_found = NULL;
+  if (last_computed_tree == NULL) {
+    while (i< taille_l && valeur_Noeud(l[i]) != cible) {
+      i++;
+    }
+    if (i!= taille_l) {
+      is_sol_found = 1;
+      sol_found = l[i];
+    }
+  } else if (valeur_Noeud(last_computed_tree) == cible) {
+    is_sol_found = 1;
+    sol_found = last_computed_tree;
   }
-  if (i!= taille_l) {
-    /*cette référence ne sera plus utilisée */
-    if(!best_res->SolNull)
+  
+  if(is_sol_found) {
+    if (!best_res -> SolNull) {
+      /*cette référence ne sera plus utilisée */
       rm_arbre(best_res->BestArbre.a);
-      
-    profa = profondeur_arbre(l[i]);
-    c=string_arbre(l[i]);
+    }
+    
+    profa = profondeur_arbre(sol_found);
+    c=string_arbre(sol_found);
     printf("%d = %s ; %d\n",cible,c,profa);
     free(c);
-    best_res->BestArbre.a=clone_arbre(l[i]);
+    best_res->BestArbre.a=clone_arbre(sol_found);
     best_res->BestArbre.pr=profa;
     best_res->SolNull=0;
     return ;
   } else {
-    if(!best_res->SolNull) {
-      if(prof + 1 < best_res->BestArbre.pr && taille_l != 1)
-        algo2(l,taille_l,prof+1,best_res,cible,p);
-      return;
-    } else {
-      if(taille_l != 1)
-        algo2(l,taille_l,prof+1,best_res,cible,p);
-      return;
+    prof=prof+1;
+
+    if((!best_res->SolNull && prof >= best_res->BestArbre.pr)) {
+        return;
     }
   }
-}
 
-void algo2 (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_res, int cible, malloc_arbre_pool* p) {
-  short exception = 0;
-  unsigned int a,b,i;
-  int val_a,val_b;
-  arbre ** nouv;
+  unsigned int a,b;
 
-  nouv = pool_get_arbretable(p,prof);
+  arbre nouv_arbre;
+  nouv_arbre.type = Noeud;
   
-  short new_list = 1;
-  for(a = 0;a < (taille_l - 1) && ! exception;a++) {
-    short new_a = 1;
-    for(b = a+1;b < taille_l && ! exception;b++) {
-      if (new_list) {
-        new_list = 0;
-        new_a = 0;
-        for(i=0;i < b ;i++)
-          nouv[i] = l[i];
-        for(i=b+1;i < taille_l  ;i++)
-          nouv[i-1] = l[i];
-      } else {
-        if (new_a) {
-          new_a = 0;
-          // if we are here, a != 0
-          for(i=a-1; i < b ;i++) {
-            nouv[i] = l[i];
-          }
-          for(i=b+1; i < taille_l  ;i++) {
-            nouv[i-1] = l[i];
-          }
-        } else {
-          // we change only b
-          // b-1 != a
-          nouv [b-1] = l[b-1];
-        }
-      }
-      val_a = valeur_Noeud(l[a]);
-      val_b = valeur_Noeud(l[b]);
-      
-      nouv[a] = pool_get_arbre(p,prof);
-      nouv[a]->type=Noeud;
-      nouv[a]->u.Noeud.valeur=val_a + val_b;
-      nouv[a]->u.Noeud.ag = l[a];
-      nouv[a]->u.Noeud.ad = l[b];
-      nouv[a]->u.Noeud.op = Plus;
+  unsigned int taille_lMinusOne = taille_l - 1;
+
+  for(a = 0;a < taille_lMinusOne;++a) {
+
+    arbre* noeud_a = l[a];
+    int val_a = valeur_Noeud(noeud_a); 
+
+    nouv_arbre.type=Noeud;
+    
+    // to be restored at the end of this for
+    l[a] = &nouv_arbre;
+    nouv_arbre.u.Noeud.ag = noeud_a;
+
+    for(b = a+1;b < taille_l ;++b) {
+
+      arbre* noeud_b = l[b];
+      int val_b = valeur_Noeud(noeud_b);
+
+      // to be restored at the end of this for
+      l[b] = l[taille_lMinusOne];
+
+      nouv_arbre.u.Noeud.ad = noeud_b;    
+    
+      nouv_arbre.u.Noeud.valeur=val_a + val_b;
+      nouv_arbre.u.Noeud.op = Plus;
       {
-        algo(nouv,taille_l - 1, prof, best_res, cible,p);
-        
-        if (best_res->SolNull == 0 && prof >= best_res->BestArbre.pr) {
-          exception=1;
-          break;
-        }
+        algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre,p);
       }
 
-      nouv[a] = pool_get_arbre(p,prof);
-      nouv[a]->type=Noeud;
       if (val_a > val_b) {
-        nouv[a]->u.Noeud.valeur=val_a - val_b;
-        nouv[a]->u.Noeud.ag = l[a];
-        nouv[a]->u.Noeud.ad = l[b];
+        nouv_arbre.u.Noeud.valeur=val_a - val_b;
+
+        nouv_arbre.u.Noeud.op = Moins;
+        algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre,p);
       } else {
-        nouv[a]->u.Noeud.valeur=val_b - val_a;
-        nouv[a]->u.Noeud.ag = l[b];
-        nouv[a]->u.Noeud.ad = l[a];
+        nouv_arbre.u.Noeud.valeur=val_b - val_a;
+        nouv_arbre.u.Noeud.ag = noeud_b;
+        nouv_arbre.u.Noeud.ad = noeud_a;
+        
+        nouv_arbre.u.Noeud.op = Moins;
+        algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre,p);
+        nouv_arbre.u.Noeud.ag = noeud_a;
+        nouv_arbre.u.Noeud.ad = noeud_b;
       }    
-      nouv[a]->u.Noeud.op = Moins;
-      {
-        algo(nouv,taille_l - 1, prof, best_res, cible,p);
-        
-        if(best_res->SolNull == 0 && prof >= best_res->BestArbre.pr) {
-          exception=1;
-          break;
-        }
-      }        
 
-      if (val_a != 1 && val_b != 1) {
-        nouv[a] = pool_get_arbre(p,prof);
-        nouv[a]->type=Noeud;
-        nouv[a]->u.Noeud.valeur=val_a * val_b;
-        nouv[a]->u.Noeud.ag = l[a];
-        nouv[a]->u.Noeud.ad = l[b];
-        nouv[a]->u.Noeud.op = Mult;
+      if (val_a > 1 && val_b > 1) {
+        nouv_arbre.u.Noeud.valeur=val_a * val_b;
+        nouv_arbre.u.Noeud.op = Mult;
         {
-          algo(nouv,taille_l - 1, prof, best_res, cible,p);
-
-          if(best_res->SolNull == 0 && prof >= best_res->BestArbre.pr) {
-            exception=1;
-            break;
-          }            
+          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre,p);
         }
       }
 
-      if(val_b > 1 && (val_a % val_b) == 0) {
-        nouv[a] = pool_get_arbre(p,prof);
-        nouv[a]->type=Noeud;
-        nouv[a]->u.Noeud.valeur=val_a / val_b;
-        nouv[a]->u.Noeud.ag = l[a];
-        nouv[a]->u.Noeud.ad = l[b];
-        nouv[a]->u.Noeud.op = Divi;
+      if( val_a > val_b && val_b > 1 && (val_a % val_b) == 0) {
+        nouv_arbre.u.Noeud.valeur=val_a / val_b;
+        nouv_arbre.u.Noeud.op = Divi;
         {
-          algo(nouv,taille_l - 1, prof, best_res, cible,p);
-          
-          if(best_res->SolNull == 0 && prof >= best_res->BestArbre.pr) {
-            exception=1;
-            break;
-          }
+          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre,p);
         }
       }
       
-      nouv[a] = pool_get_arbre(p,prof);
-      nouv[a]->type=Noeud;
-      nouv[a]->u.Noeud.valeur=val_b - val_a;
-      nouv[a]->u.Noeud.ag = l[b];
-      nouv[a]->u.Noeud.ad = l[a];
-      nouv[a]->u.Noeud.op = Moins;
-      {
-        algo(nouv,taille_l - 1, prof, best_res, cible,p);
-        
-        if(best_res->SolNull == 0 && prof >= best_res->BestArbre.pr) {
-          exception=1;
-          break;         
-        }
-      }
-      
-      if(val_a > 1 && (val_b % val_a) == 0) {
-        nouv[a] = pool_get_arbre(p,prof);
-        nouv[a]->type=Noeud;
-        nouv[a]->u.Noeud.valeur=val_b / val_a;
-        nouv[a]->u.Noeud.ag = l[b];
-        nouv[a]->u.Noeud.ad = l[a];
-        nouv[a]->u.Noeud.op = Divi;
+      if(val_b > val_a && val_a > 1 && (val_b % val_a) == 0) {
+        nouv_arbre.u.Noeud.valeur=val_b / val_a;
+        nouv_arbre.u.Noeud.ag = noeud_b;
+        nouv_arbre.u.Noeud.ad = noeud_a;
+        nouv_arbre.u.Noeud.op = Divi;
         {
-          algo(nouv,taille_l - 1, prof, best_res, cible,p);
-              
-          if(best_res->SolNull == 0 && prof >= best_res->BestArbre.pr) {
-            exception=1;
-            break;
-          }
+          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre,p);
         }
       }
+      l[b] = noeud_b;
     }
+    l[a] = noeud_a;
   }
   return;
 }
@@ -395,7 +330,7 @@ void le_compte_est_bon (unsigned int * liste, unsigned int liste_n, unsigned int
   
   liste_a=construct_arbre(liste,liste_n);
   
-  algo(liste_a,liste_n,0,&res,cible,&p);
+  algo(liste_a,liste_n,0,&res,cible,NULL,&p);
   
   if(!res.SolNull) {
     c=string_arbre(res.BestArbre.a);
