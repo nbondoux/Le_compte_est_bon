@@ -63,34 +63,6 @@ void rm_arbre(arbre * a) {
   free(a);
 }
 
-typedef struct {
-  arbre ** arbre_pool;
-  unsigned int prof_max;
-} malloc_arbre_pool;
-
-void pool_create(malloc_arbre_pool* p, unsigned int n_input) {
-  unsigned int i;
-  p->prof_max=n_input-1;
-  
-  p->arbre_pool=(arbre **) malloc(sizeof(arbre*) *(n_input-1));
-  
-  for(i=1;i<n_input;i++) {
-    p->arbre_pool[i-1]=create_arbreElem();
-  }
-}
-
-void pool_delete(malloc_arbre_pool* p) {
-  unsigned int i;
-  for(i=1;i<=p->prof_max;i++) {
-    free(p->arbre_pool[i-1]);
-  }
-  free(p->arbre_pool);
-}
-
-inline arbre * pool_get_arbre(malloc_arbre_pool* p, unsigned int pr) {
-  return p->arbre_pool[pr-1];
-}
-
 /* solution trouvée, et nombre d'opérations dans la solution */
 
 typedef struct {
@@ -191,7 +163,7 @@ inline unsigned int valeur_Noeud (arbre * a) {
 }
 
 
-void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_res, int cible, arbre * last_computed_tree, malloc_arbre_pool* p) {
+void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_res, int cible, arbre * last_computed_tree) {
 
   unsigned int i=0;
   unsigned int profa;
@@ -265,21 +237,21 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
       nouv_arbre.u.Noeud.valeur=val_a + val_b;
       nouv_arbre.u.Noeud.op = Plus;
       {
-        algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre,p);
+        algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
       }
 
       if (val_a > val_b) {
         nouv_arbre.u.Noeud.valeur=val_a - val_b;
 
         nouv_arbre.u.Noeud.op = Moins;
-        algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre,p);
+        algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
       } else {
         nouv_arbre.u.Noeud.valeur=val_b - val_a;
         nouv_arbre.u.Noeud.ag = noeud_b;
         nouv_arbre.u.Noeud.ad = noeud_a;
         
         nouv_arbre.u.Noeud.op = Moins;
-        algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre,p);
+        algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
         nouv_arbre.u.Noeud.ag = noeud_a;
         nouv_arbre.u.Noeud.ad = noeud_b;
       }    
@@ -288,7 +260,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
         nouv_arbre.u.Noeud.valeur=val_a * val_b;
         nouv_arbre.u.Noeud.op = Mult;
         {
-          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre,p);
+          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
         }
       }
 
@@ -296,7 +268,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
         nouv_arbre.u.Noeud.valeur=val_a / val_b;
         nouv_arbre.u.Noeud.op = Divi;
         {
-          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre,p);
+          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
         }
       }
       
@@ -306,7 +278,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
         nouv_arbre.u.Noeud.ad = noeud_a;
         nouv_arbre.u.Noeud.op = Divi;
         {
-          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre,p);
+          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
         }
       }
       l[b] = noeud_b;
@@ -324,13 +296,9 @@ void le_compte_est_bon (unsigned int * liste, unsigned int liste_n, unsigned int
   solution res;
   res.SolNull=1;
 
-  malloc_arbre_pool p;
-  
-  pool_create(&p,liste_n);
-  
   liste_a=construct_arbre(liste,liste_n);
   
-  algo(liste_a,liste_n,0,&res,cible,NULL,&p);
+  algo(liste_a,liste_n,0,&res,cible,NULL);
   
   if(!res.SolNull) {
     c=string_arbre(res.BestArbre.a);
@@ -345,7 +313,6 @@ void le_compte_est_bon (unsigned int * liste, unsigned int liste_n, unsigned int
   for(i=0;i<liste_n;i++)
     rm_arbre(liste_a[i]);
   free(liste_a);
-  pool_delete(&p);
 }
 
 void message_help(char * prog) {
