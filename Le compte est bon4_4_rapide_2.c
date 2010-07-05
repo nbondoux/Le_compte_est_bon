@@ -9,10 +9,9 @@
 */
 
 struct struct_arbre {
+  unsigned int valeur;
   union {
-    unsigned int Nombre;
     struct { 
-      unsigned int valeur;
       struct struct_arbre * ag;
       struct struct_arbre * ad;
       enum {Plus, Moins, Mult, Divi}  op;
@@ -35,11 +34,11 @@ inline void copy_arbre_inner (const arbre* iArbre,
                               arbre* oArbre) {
   if (iArbre->type == Nombre) {
     oArbre->type = Nombre;
-    oArbre->u.Nombre = iArbre->u.Nombre;
+    oArbre->valeur = iArbre->valeur;
   } else {
     // iArbre.type == Noeud
     oArbre->type = Noeud;
-    oArbre->u.Noeud.valeur = iArbre->u.Noeud.valeur;
+    oArbre->valeur = iArbre->valeur;
     oArbre->u.Noeud.op = iArbre->u.Noeud.op;
   }
 }
@@ -133,7 +132,7 @@ char * string_arbre (arbre * a) {
     free(c2);
   } else {
     char n[500];
-    sprintf(n,"%u",a->u.Nombre);
+    sprintf(n,"%u",a->valeur);
     c = (char *) malloc (sizeof(char) * (strlen(n) + 1));
     strcpy(c,n);
   }
@@ -149,17 +148,13 @@ arbre ** construct_arbre(unsigned int * l, unsigned int n) {
   for(i=0;i<n;i++) {
     a[i]=create_arbreElem();
     a[i]->type=Nombre;
-    a[i]->u.Nombre = l[i];
+    a[i]->valeur= l[i];
   }
   return a;
 }
 
 inline unsigned int valeur_Noeud (arbre * a) {
-  if(a->type==Noeud) {
-    return a->u.Noeud.valeur;
-  } else {
-    return a->u.Nombre;
-  }
+  return a->valeur;
 }
 
 
@@ -201,7 +196,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
   } else {
     prof=prof+1;
 
-    if((!best_res->SolNull && prof >= best_res->BestArbre.pr)) {
+    if(!best_res->SolNull && prof >= best_res->BestArbre.pr) {
         return;
     }
   }
@@ -234,19 +229,19 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
 
       nouv_arbre.u.Noeud.ad = noeud_b;    
     
-      nouv_arbre.u.Noeud.valeur=val_a + val_b;
+      nouv_arbre.valeur=val_a + val_b;
       nouv_arbre.u.Noeud.op = Plus;
       {
         algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
       }
 
       if (val_a > val_b) {
-        nouv_arbre.u.Noeud.valeur=val_a - val_b;
+        nouv_arbre.valeur=val_a - val_b;
 
         nouv_arbre.u.Noeud.op = Moins;
         algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
       } else {
-        nouv_arbre.u.Noeud.valeur=val_b - val_a;
+        nouv_arbre.valeur=val_b - val_a;
         nouv_arbre.u.Noeud.ag = noeud_b;
         nouv_arbre.u.Noeud.ad = noeud_a;
         
@@ -257,7 +252,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
       }    
 
       if (val_a > 1 && val_b > 1) {
-        nouv_arbre.u.Noeud.valeur=val_a * val_b;
+        nouv_arbre.valeur=val_a * val_b;
         nouv_arbre.u.Noeud.op = Mult;
         {
           algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
@@ -265,7 +260,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
       }
 
       if( val_a > val_b && val_b > 1 && (val_a % val_b) == 0) {
-        nouv_arbre.u.Noeud.valeur=val_a / val_b;
+        nouv_arbre.valeur=val_a / val_b;
         nouv_arbre.u.Noeud.op = Divi;
         {
           algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
@@ -273,7 +268,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
       }
       
       if(val_b > val_a && val_a > 1 && (val_b % val_a) == 0) {
-        nouv_arbre.u.Noeud.valeur=val_b / val_a;
+        nouv_arbre.valeur=val_b / val_a;
         nouv_arbre.u.Noeud.ag = noeud_b;
         nouv_arbre.u.Noeud.ad = noeud_a;
         nouv_arbre.u.Noeud.op = Divi;
