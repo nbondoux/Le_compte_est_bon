@@ -104,30 +104,65 @@ algo2_foreach_op iA iB iBase iTail iBest_res iCible iProf iException=
     let next_algo new_node iBest_res1 = algo (iBase++[new_node]++iTail) iProf iBest_res1 iCible iException
     in
       do
-        sol1 <-  next_algo (Noeud (val_a+val_b) iA iB Plus) iBest_res
-      	sol2 <-  (
-                   if (val_a > val_b) then
-                     next_algo (Noeud (val_a-val_b) iA iB Moins) sol1
-                   else
-                     next_algo (Noeud (val_b-val_a) iB iA Moins) sol1
-                 )
-      	sol3 <-  (
-                  if (val_a /= 1 && val_b /=1) then
-                    next_algo (Noeud (val_a*val_b) iA iB Mult) sol2
-                  else
-                    return sol2
-                 )        
-        sol4 <- (
-      	         if (val_b > 1  &&  (val_a `mod` val_b) == 0) then
-                     next_algo (Noeud (div val_a val_b) iA iB Divi) sol3
-	         else
-                     return sol3
+        {-
+           for optimization purposes,
+           the following operations are evited:
+            a + (b+c), (b+c) -a
+            a * (b*c), (b*c) /a
+        -}
+
+        sol1 <-(case iB of
+                   Noeud _ _ _ Plus -> return iBest_res
+                   _ -> (
+                         do
+                           sol <- next_algo (Noeud (val_a+val_b) iA iB Plus) iBest_res
+                           (
+                             if (val_b > val_a) then
+                               next_algo (Noeud (val_b-val_a) iB iA Moins) sol
+                             else
+                               return sol
+                             )
+                        )
+               )
+
+        sol2 <- (case iA of
+                    Noeud _ _ _ Plus -> return sol1
+                    _ -> (
+                          if (val_a > val_b) then
+                            next_algo (Noeud (val_a-val_b) iA iB Moins) sol1
+                          else
+                            return sol1
+                         )
                 )
-        (
-         if (val_a > 1 &&  (val_b `mod` val_a) == 0) then
-	     next_algo (Noeud (div val_b val_a) iB iA Divi) sol4
-	 else
-	     return sol4)
+
+        sol3 <-(case iB of
+                   Noeud _ _ _ Mult -> return sol2
+                   _ -> (
+                         do
+                           sol <- (
+                                   if (val_a > 1 && val_b > 1) then
+                                     next_algo (Noeud (val_a*val_b) iA iB Mult) sol2
+                                   else
+                                     return sol2
+                                  )
+        
+                           (
+                             if (val_a > 1  &&  (val_b `mod` val_a) == 0) then
+                               next_algo (Noeud (div val_b val_a) iB iA Divi) sol
+                             else
+                               return sol
+                             )
+                        )
+               )
+        (case iA of
+            Noeud _ _ _ Mult -> return sol3
+            _ -> (
+                  if (val_b > 1  &&  (val_a `mod` val_b) == 0) then
+                    next_algo (Noeud (div val_a val_b) iA iB Divi) sol3
+                  else
+                    return sol3
+                 )
+          )
 
 
 algo2_foreach_b iA iBase iList iBest_res iCible iProf iException=

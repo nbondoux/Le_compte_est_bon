@@ -219,7 +219,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
     l[a] = &nouv_arbre;
     nouv_arbre.u.Noeud.ag = noeud_a;
 
-    for(b = a+1;b < taille_l ;++b) {
+    for (b = a+1;b < taille_l ;++b) {
 
       arbre* noeud_b = l[b];
       int val_b = valeur_Noeud(noeud_b);
@@ -228,54 +228,68 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
       l[b] = l[taille_lMinusOne];
 
       nouv_arbre.u.Noeud.ad = noeud_b;    
-    
-      nouv_arbre.valeur=val_a + val_b;
-      nouv_arbre.u.Noeud.op = Plus;
-      {
-        algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+
+      // for optimizations purposes,
+      // the following operations are evited:
+      // a + (b+c), (b+c) -a
+      // a * (b*c), (b*c) /a
+
+      if (noeud_b -> type != Noeud || noeud_b -> u.Noeud.op != Plus) {
+        nouv_arbre.valeur=val_a + val_b;
+        nouv_arbre.u.Noeud.op = Plus;
+        {
+          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+        }
+        if (val_b > val_a) {
+          nouv_arbre.valeur=val_b - val_a;
+          nouv_arbre.u.Noeud.ag = noeud_b;
+          nouv_arbre.u.Noeud.ad = noeud_a;
+          
+          nouv_arbre.u.Noeud.op = Moins;
+          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+          nouv_arbre.u.Noeud.ag = noeud_a;
+          nouv_arbre.u.Noeud.ad = noeud_b;
+        }
       }
 
       if (val_a > val_b) {
-        nouv_arbre.valeur=val_a - val_b;
+         if (noeud_a -> type != Noeud || noeud_a -> u.Noeud.op != Plus) {
+           nouv_arbre.valeur=val_a - val_b;
+           nouv_arbre.u.Noeud.op = Moins;
+           algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+         }
+      }
 
-        nouv_arbre.u.Noeud.op = Moins;
-        algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
-      } else {
-        nouv_arbre.valeur=val_b - val_a;
-        nouv_arbre.u.Noeud.ag = noeud_b;
-        nouv_arbre.u.Noeud.ad = noeud_a;
-        
-        nouv_arbre.u.Noeud.op = Moins;
-        algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
-        nouv_arbre.u.Noeud.ag = noeud_a;
-        nouv_arbre.u.Noeud.ad = noeud_b;
-      }    
+      if (noeud_b -> type != Noeud || noeud_b -> u.Noeud.op != Mult) {
+        if (val_a > 1 && val_b > 1) {
+          nouv_arbre.valeur=val_a * val_b;
+          nouv_arbre.u.Noeud.op = Mult;
+          {
+            algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+          }
+        }
 
-      if (val_a > 1 && val_b > 1) {
-        nouv_arbre.valeur=val_a * val_b;
-        nouv_arbre.u.Noeud.op = Mult;
-        {
-          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+        if(val_b > val_a && val_a > 1 && (val_b % val_a) == 0) {
+          nouv_arbre.valeur=val_b / val_a;
+          nouv_arbre.u.Noeud.ag = noeud_b;
+          nouv_arbre.u.Noeud.ad = noeud_a;
+          nouv_arbre.u.Noeud.op = Divi;
+          {
+            algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+          }
         }
       }
 
-      if( val_a > val_b && val_b > 1 && (val_a % val_b) == 0) {
-        nouv_arbre.valeur=val_a / val_b;
-        nouv_arbre.u.Noeud.op = Divi;
-        {
-          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+      if (noeud_a -> type != Noeud || noeud_a -> u.Noeud.op != Mult) {
+        if( val_a > val_b && val_b > 1 && (val_a % val_b) == 0) {
+          nouv_arbre.valeur=val_a / val_b;
+          nouv_arbre.u.Noeud.op = Divi;
+          {
+            algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+          }
         }
       }
       
-      if(val_b > val_a && val_a > 1 && (val_b % val_a) == 0) {
-        nouv_arbre.valeur=val_b / val_a;
-        nouv_arbre.u.Noeud.ag = noeud_b;
-        nouv_arbre.u.Noeud.ad = noeud_a;
-        nouv_arbre.u.Noeud.op = Divi;
-        {
-          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
-        }
-      }
       l[b] = noeud_b;
     }
     l[a] = noeud_a;
