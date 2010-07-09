@@ -106,7 +106,7 @@ algo2_foreach_op iA iB iBase iTail iBest_res iCible iProf iException=
       do
         {-
            for optimization purposes,
-           the following operations are evited:
+           the following operations are skipped:
             a + (b+c), (b+c) -a
             a * (b*c), (b*c) /a
         -}

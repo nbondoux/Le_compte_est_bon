@@ -230,7 +230,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
       nouv_arbre.u.Noeud.ad = noeud_b;    
 
       // for optimizations purposes,
-      // the following operations are evited:
+      // the following operations are skipped:
       // a + (b+c), (b+c) -a
       // a * (b*c), (b*c) /a
 
