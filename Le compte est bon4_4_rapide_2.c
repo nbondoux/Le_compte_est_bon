@@ -158,7 +158,7 @@ inline unsigned int valeur_Noeud (arbre * a) {
 }
 
 
-void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_res, int cible, arbre * last_computed_tree) {
+void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_res, int cible, arbre * last_computed_tree, int left_bound_for_new_productions) {
 
   unsigned int i=0;
   unsigned int profa;
@@ -218,8 +218,19 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
     // to be restored at the end of this for
     l[a] = &nouv_arbre;
     nouv_arbre.u.Noeud.ag = noeud_a;
+    
+    b = a+1;
 
-    for (b = a+1;b < taille_l ;++b) {
+    // this optimization seems ugly and could be maybe be better ?
+    // the principle is that: if we are in state:
+    // a1 ..... am am+1 ... an where am+1 has just been produced,
+    // we can expect the cases with all combinations of a1...am have already
+    // been tested (by current design)
+    if (left_bound_for_new_productions > b) {
+      b = left_bound_for_new_productions;
+    }
+    
+    for (;b < taille_l ;++b) {
 
       arbre* noeud_b = l[b];
       int val_b = valeur_Noeud(noeud_b);
@@ -238,7 +249,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
         nouv_arbre.valeur=val_a + val_b;
         nouv_arbre.u.Noeud.op = Plus;
         {
-          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre, a);
         }
         if (val_b > val_a) {
           nouv_arbre.valeur=val_b - val_a;
@@ -246,7 +257,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
           nouv_arbre.u.Noeud.ad = noeud_a;
           
           nouv_arbre.u.Noeud.op = Moins;
-          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+          algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre, a);
           nouv_arbre.u.Noeud.ag = noeud_a;
           nouv_arbre.u.Noeud.ad = noeud_b;
         }
@@ -256,7 +267,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
          if (noeud_a -> type != Noeud || noeud_a -> u.Noeud.op != Plus) {
            nouv_arbre.valeur=val_a - val_b;
            nouv_arbre.u.Noeud.op = Moins;
-           algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+           algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre, a);
          }
       }
 
@@ -265,7 +276,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
           nouv_arbre.valeur=val_a * val_b;
           nouv_arbre.u.Noeud.op = Mult;
           {
-            algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+            algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre, a);
           }
         }
 
@@ -275,7 +286,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
           nouv_arbre.u.Noeud.ad = noeud_a;
           nouv_arbre.u.Noeud.op = Divi;
           {
-            algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+            algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre, a);
           }
         }
       }
@@ -285,7 +296,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
           nouv_arbre.valeur=val_a / val_b;
           nouv_arbre.u.Noeud.op = Divi;
           {
-            algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre);
+            algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre, a);
           }
         }
       }
@@ -307,7 +318,7 @@ void le_compte_est_bon (unsigned int * liste, unsigned int liste_n, unsigned int
 
   liste_a=construct_arbre(liste,liste_n);
   
-  algo(liste_a,liste_n,0,&res,cible,NULL);
+  algo(liste_a,liste_n,0,&res,cible,NULL,0);
   
   if(!res.SolNull) {
     c=string_arbre(res.BestArbre.a);
