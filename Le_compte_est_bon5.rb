@@ -227,7 +227,7 @@ module Le_Compte_Est_Bon
     if iBestSol.depth and iBestSol.depth < iMaxDepth
       iMaxDepth = iBestSol.depth
     end
-    if iL.empty or iLSize + 1 < iMinDepth or (iMaxDepth < iMinDepth)
+    if iL.empty or iLSize < iMinDepth + 1 or (iMaxDepth < iMinDepth)
     # if l.size is one
     elsif iL.next == SingleChainedList.emptyList
       elmt = iL.content
