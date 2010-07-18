@@ -234,10 +234,10 @@ module Le_Compte_Est_Bon
   #above minus a delta
   
   class MaxDepth
-    attr_reader :delta,:maxDepth,:overallMaxDepth,:childA,:childB
+    attr_reader :delta,:maxDepth,:childA,:childB
     attr_writer :childA,:childB
 
-    def initialize (iOverallMaxDepth=self,iMaxDepth=99999,iDelta=0)
+    def initialize (iMaxDepth=99999,iDelta=0)
       @childA = nil
       @childB = nil
       @maxDepth = iMaxDepth
