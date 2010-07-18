@@ -2,9 +2,9 @@
 $compteur2=0
 module Le_Compte_Est_Bon
   
-  class SingleChainedList
-    attr_reader :content,:next
-    attr_writer :content,:next
+  class SingleChainedListAbstract
+    attr_reader :next
+    attr_writer :next
     
     class SingleChainedListEnd
       def empty
@@ -27,10 +27,9 @@ module Le_Compte_Est_Bon
 
     def initialize
       @next = @@emptyList
-      @content = nil
     end
     
-    def SingleChainedList.emptyList
+    def SingleChainedListAbstract.emptyList
       @@emptyList
     end    
     
@@ -41,6 +40,23 @@ module Le_Compte_Est_Bon
     def size
       1+@next.size
     end
+
+    def each(&block)
+      block.call(self)
+      @next.each(&block)
+    end
+
+    def reverse_each(&block)
+      @next.reverse_each(self)
+      block.call(content)
+    end
+    
+  end
+
+  class SingleChainedList < SingleChainedListAbstract
+    attr_reader :content
+    attr_writer :content
+
 
     def each(&block)
       block.call(content)
@@ -54,10 +70,9 @@ module Le_Compte_Est_Bon
     
     def to_s
       "#{content.to_s}, "+@next.to_s
-    end
-
+    end   
   end
-    
+  
   def Le_Compte_Est_Bon.arrayToSingleChained a
     l = SingleChainedList.emptyList
     a.reverse_each {|elmt|
@@ -212,26 +227,81 @@ module Le_Compte_Est_Bon
     end
   end
 
-  def Le_Compte_Est_Bon.checkNode(iNode, iTarget, iBestSol)
+  #the chain of MaxDepth represents maximum authorized depth
+  #from top of algo (linked by overallMaxDepth)
+  #to the algos in depth (leafs of the tree)
+  #maxDepth at a level is always calculated as the one of the level
+  #above minus a delta
+  
+  class MaxDepth
+    attr_reader :delta,:maxDepth,:overallMaxDepth,:childA,:childB
+    attr_writer :childA,:childB
+
+    def initialize (iOverallMaxDepth=self,iMaxDepth=999,iDelta=0)
+      @childA = nil
+      @childB = nil
+      @overallMaxDepth = iOverallMaxDepth
+      @maxDepth = iMaxDepth
+      @delta = iDelta
+      @maxDepthMinusDelta = iMaxDepth - iDelta
+    end
+    
+    def maxDepth=(iMaxDepth)
+      @maxDepth=iMaxDepth
+      @maxDepthMinusDelta=iMaxDepth - @delta
+    end
+    
+    def delta=(iDelta)
+      @delta=iDelta
+      @maxDepthMinusDelta=@maxDepth - iDelta
+    end
+    
+    def propagateMaxDepth
+      if @childA
+        @childA.maxDepth=@maxDepthMinusDelta
+        @childA.propagateMaxDepth
+      end
+      if @childB
+        @childB.maxDepth=@maxDepthMinusDelta
+        @childB.propagateMaxDepth
+      end
+    end
+    
+    def currentMaxDepth
+      @maxDepthMinusDelta
+    end
+  end
+
+
+
+  def Le_Compte_Est_Bon.checkNode(iNode, iTarget, iBestSol,iOverallMaxDepth)
     $compteur2 = $compteur2 + 1
 
     if iNode.value == iTarget
       if (not iBestSol.bestSolution) or iNode.depth < iBestSol.depth
+        #propagte new max-depth constraints to all the algorithm
+        iOverallMaxDepth.maxDepth=iNode.depth
+        iOverallMaxDepth.propagateMaxDepth
+
         iBestSol.bestSolution=iNode.duplicateTree
         puts "#{iTarget} = #{iBestSol.bestSolution}; #{iBestSol.depth}"
       end
     end
   end
 
+
   def Le_Compte_Est_Bon.algo (iL, iLSize,iTarget, iBestSol, iMinDepth, iMaxDepth, &block)
-    if iBestSol.depth and iBestSol.depth < iMaxDepth
+    currentMaxDepth = iMaxDepth.currentMaxDepth
+
+    if iBestSol.depth and iBestSol.depth < currentMaxDepth
       iMaxDepth = iBestSol.depth
     end
-    if iL.empty or iLSize < iMinDepth + 1 or (iMaxDepth < iMinDepth)
+    if iL.empty or iLSize < iMinDepth + 1 or (currentMaxDepth <= iMinDepth or
+                                              currentMaxDepth + 1 <= iLSize)
     # if l.size is one
     elsif iL.next == SingleChainedList.emptyList
       elmt = iL.content
-      checkNode(elmt,iTarget,iBestSol)
+      checkNode(elmt,iTarget,iBestSol,iMaxDepth.overallMaxDepth)
       if elmt.depth >= iMinDepth
         yield elmt
       end
@@ -261,8 +331,31 @@ module Le_Compte_Est_Bon
           algo(l2, l2_size, iTarget, iBestSol, minDepthForL2alone, iMaxDepth, &block)
 
           # yield all combination of elements of l1 X l2
+
+          maxDepthForL1 = iMaxDepth.childA
+          if not maxDepthForL1
+            maxDepthForL1 = MaxDepth.new(iMaxDepth.overallMaxDepth,
+                                         iMaxDepth.currentMaxDepth,
+                                         0)
+            iMaxDepth.childA = maxDepthForL1
+          else
+            maxDepthForL1.maxDepth=iMaxDepth.currentMaxDepth
+            maxDepthForL1.delta=0
+          end
+
+          maxDepthForL2 = iMaxDepth.childB
+          if not maxDepthForL2
+            maxDepthForL2 = MaxDepth.new(iMaxDepth.overallMaxDepth,
+                                         iMaxDepth.currentMaxDepth,
+                                         0)
+            iMaxDepth.childB = maxDepthForL2
+          else
+            maxDepthForL2.maxDepth=iMaxDepth.currentMaxDepth
+            maxDepthForL2.delta=0
+          end
+
      
-          algo(l2, l2_size, iTarget, iBestSol, minDepthForL2, iMaxDepth) {|elmt2|
+          algo(l2, l2_size, iTarget, iBestSol, minDepthForL2, maxDepthForL2) {|elmt2|
             # MinDepth = minDepthForL1 + 1 + depthOfL2Elmt          
             minDepthForL1 = iMinDepth - 1 - elmt2.depth
             if minDepthForL1 < 0
@@ -270,16 +363,12 @@ module Le_Compte_Est_Bon
             end
 
             # MaxDepth = maxDepthForL1 + 1 + depthOfL2Elmt
-            maxDepthForL1= iMaxDepth - 1 - elmt2.depth
+            maxDepthForL1.delta = 1 + elmt2.depth
 
             algo(l1, l1_size, iTarget, iBestSol, minDepthForL1, maxDepthForL1) {|elmt1|
               newDepth = elmt1.depth + elmt2.depth + 1
-      
-              if iBestSol.depth and iBestSol.depth < iMaxDepth
-                iMaxDepth = iBestSol.depth
-              end
-              
-              if iMaxDepth > newDepth
+                    
+              if iMaxDepth.currentMaxDepth > newDepth
 
                 newNode = Node.new
                 newNode.depth = newDepth
@@ -291,7 +380,7 @@ module Le_Compte_Est_Bon
                 if elmt2.class != Node or elmt2.operation != :Add
                   newNode.value=val1 + val2
                   newNode.operation = :Add
-                  checkNode(newNode,iTarget,iBestSol)
+                  checkNode(newNode,iTarget,iBestSol,iMaxDepth.overallMaxDepth)
                   block.call(newNode)
                             
                   if val2 > val1
@@ -301,7 +390,7 @@ module Le_Compte_Est_Bon
                     newNode.rightNode = elmt1
                     newNode.operation = :Minus
                     
-                    checkNode(newNode,iTarget,iBestSol)
+                    checkNode(newNode,iTarget,iBestSol,iMaxDepth.overallMaxDepth)
                     block.call(newNode)
                     newNode.leftNode = elmt1
                     newNode.rightNode = elmt2
@@ -312,7 +401,7 @@ module Le_Compte_Est_Bon
                   if elmt1.class != Node or elmt1.operation != :Add
                     newNode.value=val1 - val2
                     newNode.operation = :Minus
-                    checkNode(newNode,iTarget,iBestSol)
+                    checkNode(newNode,iTarget,iBestSol,iMaxDepth.overallMaxDepth)
                     block.call(newNode)
                   end
                 end
@@ -322,7 +411,7 @@ module Le_Compte_Est_Bon
                     newNode.value=val1 * val2
                     newNode.operation = :Mult
                     
-                    checkNode(newNode,iTarget,iBestSol)
+                    checkNode(newNode,iTarget,iBestSol,iMaxDepth.overallMaxDepth)
                     block.call(newNode)
                   end
             
@@ -332,7 +421,7 @@ module Le_Compte_Est_Bon
                     newNode.rightNode = elmt1
                     newNode.operation = :Divi
                     
-                    checkNode(newNode,iTarget,iBestSol)
+                    checkNode(newNode,iTarget,iBestSol,iMaxDepth.overallMaxDepth)
                     block.call(newNode)
                     newNode.leftNode = elmt1
                     newNode.rightNode = elmt2
@@ -345,7 +434,7 @@ module Le_Compte_Est_Bon
                     newNode.value=val1 / val2
                     newNode.operation = :Divi
                     
-                    checkNode(newNode,iTarget,iBestSol)
+                    checkNode(newNode,iTarget,iBestSol,iMaxDepth.overallMaxDepth)
                     block.call(newNode)
                   end
                 end
@@ -362,7 +451,10 @@ module Le_Compte_Est_Bon
 
     compteur = 0
     l=arrayToSingleChained(iL.collect {|elmt| FinalNode.new(elmt)})
-    Le_Compte_Est_Bon.algo(l,l.size(), iTarget, aBestSol, 0,9999) {|elmt|
+    
+    maxDepth = MaxDepth.new
+
+    Le_Compte_Est_Bon.algo(l,l.size(), iTarget, aBestSol, 0,maxDepth) {|elmt|
           compteur = compteur+1 }
      #puts "#{elmt}"}
     #to-do: cleaning; remove "compteur" variables
