@@ -289,7 +289,7 @@ module Le_Compte_Est_Bon
           @overallMaxDepth.propagateMaxDepth
           
           @bestSol.bestSolution=iNode.duplicateTree
-          puts "#{@Target} = #{@bestSol.bestSolution}; #{@bestSol.depth}"
+          puts "#{@target} = #{@bestSol.bestSolution}; #{@bestSol.depth}"
         end
       end
     end
@@ -351,8 +351,9 @@ module Le_Compte_Est_Bon
               maxDepthForL2.maxDepth=iMaxDepth.currentMaxDepth
               maxDepthForL2.delta=0
             end
-            
-     
+
+            newNode = Node.new
+                 
             algo(l2, l2_size, minDepthForL2, maxDepthForL2) {|elmt2|
               # MinDepth = minDepthForL1 + 1 + depthOfL2Elmt          
               minDepthForL1 = iMinDepth - 1 - elmt2.depth
@@ -368,20 +369,20 @@ module Le_Compte_Est_Bon
                 
                 if iMaxDepth.currentMaxDepth > newDepth
 
-                  newNode = Node.new
                   newNode.depth = newDepth
                   newNode.leftNode = elmt1
                   newNode.rightNode = elmt2
                   val1 = elmt1.value
                   val2 = elmt2.value
                   
-                  if elmt2.class != Node or elmt2.operation != :Add
-                    newNode.value=val1 + val2
-                    newNode.operation = :Add
-                    checkNode(newNode)
-                    block.call(newNode)
+     
+                  newNode.value=val1 + val2
+                  newNode.operation = :Add
+                  checkNode(newNode)
+                  block.call(newNode)
                     
-                    if val2 > val1
+                  if val2 > val1
+                    if elmt2.class != Node or elmt2.operation != :Add
                       newNode.value=val2 - val1
                       
                       newNode.leftNode = elmt2
@@ -404,15 +405,15 @@ module Le_Compte_Est_Bon
                     end
                   end
                   
-                  if elmt2.class != Node or elmt2.operation != :Mult
-                    if (val1 > 1 and val2 > 1)
-                      newNode.value=val1 * val2
-                      newNode.operation = :Mult
-                      
-                      checkNode(newNode)
-                      block.call(newNode)
-                    end
+                  if (val1 > 1 and val2 > 1)
+                    newNode.value=val1 * val2
+                    newNode.operation = :Mult
                     
+                    checkNode(newNode)
+                    block.call(newNode)
+                  end
+                  
+                  if elmt2.class != Node or elmt2.operation != :Mult  
                     if(val2 > val1 and val1 > 1 and (val2 % val1) == 0)
                       newNode.value=val2 / val1
                       newNode.leftNode = elmt2
