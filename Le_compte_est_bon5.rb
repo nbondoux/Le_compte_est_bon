@@ -282,6 +282,7 @@ module Le_Compte_Est_Bon
 
     def checkNode(iNode)
       $compteur2 = $compteur2 + 1
+
       if iNode.value == @target
         if (not @bestSol.bestSolution) or iNode.depth < @bestSol.depth
           #propagte new max-depth constraints to all the algorithm
@@ -297,12 +298,15 @@ module Le_Compte_Est_Bon
     
     def algo (iL, iLSize, iMinDepth, iMaxDepth, &block)
       currentMaxDepth = iMaxDepth.currentMaxDepth
-
-      if iL.empty or iLSize < iMinDepth + 1 or currentMaxDepth + 1 <= iLSize
+      
+      if iL.empty or iLSize < iMinDepth + 1 or currentMaxDepth <= iMinDepth
         # if l.size is one
       elsif iL.next == SingleChainedList.emptyList
         elmt = iL.content
-        if elmt.depth >= iMinDepth
+        #optim:
+        #depth of iL elemts should be 0
+        # so we replace here elmt.depth with 0
+        if 0 >= iMinDepth and 0 < currentMaxDepth
           yield elmt
         end
       else
