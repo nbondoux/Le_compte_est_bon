@@ -335,21 +335,21 @@ module Le_Compte_Est_Bon
             maxDepthForL1 = iMaxDepth.childA
             if not maxDepthForL1
               maxDepthForL1 = MaxDepth.new(iMaxDepth.currentMaxDepth,
-                                           0)
+                                           1)
               iMaxDepth.childA = maxDepthForL1
             else
               maxDepthForL1.maxDepth=iMaxDepth.currentMaxDepth
-              maxDepthForL1.delta=0
+              maxDepthForL1.delta=1
             end
 
             maxDepthForL2 = iMaxDepth.childB
             if not maxDepthForL2
               maxDepthForL2 = MaxDepth.new(iMaxDepth.currentMaxDepth,
-                                           0)
+                                           1)
               iMaxDepth.childB = maxDepthForL2
             else
               maxDepthForL2.maxDepth=iMaxDepth.currentMaxDepth
-              maxDepthForL2.delta=0
+              maxDepthForL2.delta=1
             end
 
             newNode = Node.new
