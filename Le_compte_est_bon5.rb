@@ -237,10 +237,9 @@ module Le_Compte_Est_Bon
     attr_reader :delta,:maxDepth,:overallMaxDepth,:childA,:childB
     attr_writer :childA,:childB
 
-    def initialize (iOverallMaxDepth=self,iMaxDepth=999,iDelta=0)
+    def initialize (iOverallMaxDepth=self,iMaxDepth=99999,iDelta=0)
       @childA = nil
       @childB = nil
-      @overallMaxDepth = iOverallMaxDepth
       @maxDepth = iMaxDepth
       @delta = iDelta
       @maxDepthMinusDelta = iMaxDepth - iDelta
@@ -272,201 +271,207 @@ module Le_Compte_Est_Bon
     end
   end
 
+  class Algo
+    attr_reader :target,:bestSol,:overallMaxDepth
 
+    def initialize (iTarget)
+      @target = iTarget
+      @bestSol = BestSolution.new
+      @overallMaxDepth = MaxDepth.new
+    end
 
-  def Le_Compte_Est_Bon.checkNode(iNode, iTarget, iBestSol,iOverallMaxDepth)
-    $compteur2 = $compteur2 + 1
-
-    if iNode.value == iTarget
-      if (not iBestSol.bestSolution) or iNode.depth < iBestSol.depth
-        #propagte new max-depth constraints to all the algorithm
-        iOverallMaxDepth.maxDepth=iNode.depth
-        iOverallMaxDepth.propagateMaxDepth
-
-        iBestSol.bestSolution=iNode.duplicateTree
-        puts "#{iTarget} = #{iBestSol.bestSolution}; #{iBestSol.depth}"
+    def checkNode(iNode)
+      $compteur2 = $compteur2 + 1
+      if iNode.value == @target
+        if (not @bestSol.bestSolution) or iNode.depth < @bestSol.depth
+          #propagte new max-depth constraints to all the algorithm
+          @overallMaxDepth.maxDepth=iNode.depth
+          @overallMaxDepth.propagateMaxDepth
+          
+          @bestSol.bestSolution=iNode.duplicateTree
+          puts "#{@Target} = #{@bestSol.bestSolution}; #{@bestSol.depth}"
+        end
       end
     end
-  end
+    private :checkNode
+    
+    def algo (iL, iLSize, iMinDepth, iMaxDepth, &block)
+      currentMaxDepth = iMaxDepth.currentMaxDepth
 
-
-  def Le_Compte_Est_Bon.algo (iL, iLSize,iTarget, iBestSol, iMinDepth, iMaxDepth, &block)
-    currentMaxDepth = iMaxDepth.currentMaxDepth
-
-    if iBestSol.depth and iBestSol.depth < currentMaxDepth
-      iMaxDepth = iBestSol.depth
-    end
-    if iL.empty or iLSize < iMinDepth + 1 or (currentMaxDepth <= iMinDepth or
-                                              currentMaxDepth + 1 <= iLSize)
-    # if l.size is one
-    elsif iL.next == SingleChainedList.emptyList
-      elmt = iL.content
-      checkNode(elmt,iTarget,iBestSol,iMaxDepth.overallMaxDepth)
-      if elmt.depth >= iMinDepth
-        yield elmt
-      end
-    else
-      getAllSubCombinations(iL,iLSize) {|l1,l2|
-        if not l1.empty
-          l1_size = l1.size
-          l2_size = l2.size
+      if iL.empty or iLSize < iMinDepth + 1 or currentMaxDepth + 1 <= iLSize
+        # if l.size is one
+      elsif iL.next == SingleChainedList.emptyList
+        elmt = iL.content
+        if elmt.depth >= iMinDepth
+          yield elmt
+        end
+      else
+        Le_Compte_Est_Bon.getAllSubCombinations(iL,iLSize) {|l1,l2|
+          if not l1.empty
+            l1_size = l1.size
+            l2_size = l2.size
           
-          # yield all eligible elements of l1
-          algo(l1, l1_size, iTarget, iBestSol, iMinDepth, iMaxDepth, &block)
+            # yield all eligible elements of l1
+            algo(l1, l1_size, iMinDepth, iMaxDepth, &block)
 
-          minDepthForL2 = 0
+            minDepthForL2 = 0
 
-          # yield all eligible elements of l2
-          
-          if (l1_size + 1 < l2_size)
-            minDepthForL2 = l2_size - 1
-          end
-
-          minDepthForL2alone = minDepthForL2
-
-          if iMinDepth > minDepthForL2alone
-            minDepthForL2alone = iMinDepth
-          end
-
-          algo(l2, l2_size, iTarget, iBestSol, minDepthForL2alone, iMaxDepth, &block)
-
-          # yield all combination of elements of l1 X l2
-
-          maxDepthForL1 = iMaxDepth.childA
-          if not maxDepthForL1
-            maxDepthForL1 = MaxDepth.new(iMaxDepth.overallMaxDepth,
-                                         iMaxDepth.currentMaxDepth,
-                                         0)
-            iMaxDepth.childA = maxDepthForL1
-          else
-            maxDepthForL1.maxDepth=iMaxDepth.currentMaxDepth
-            maxDepthForL1.delta=0
-          end
-
-          maxDepthForL2 = iMaxDepth.childB
-          if not maxDepthForL2
-            maxDepthForL2 = MaxDepth.new(iMaxDepth.overallMaxDepth,
-                                         iMaxDepth.currentMaxDepth,
-                                         0)
-            iMaxDepth.childB = maxDepthForL2
-          else
-            maxDepthForL2.maxDepth=iMaxDepth.currentMaxDepth
-            maxDepthForL2.delta=0
-          end
-
-     
-          algo(l2, l2_size, iTarget, iBestSol, minDepthForL2, maxDepthForL2) {|elmt2|
-            # MinDepth = minDepthForL1 + 1 + depthOfL2Elmt          
-            minDepthForL1 = iMinDepth - 1 - elmt2.depth
-            if minDepthForL1 < 0
-              minDepthForL1 = 0
+            # yield all eligible elements of l2
+            
+            if (l1_size + 1 < l2_size)
+              minDepthForL2 = l2_size - 1
             end
 
-            # MaxDepth = maxDepthForL1 + 1 + depthOfL2Elmt
-            maxDepthForL1.delta = 1 + elmt2.depth
+            minDepthForL2alone = minDepthForL2
 
-            algo(l1, l1_size, iTarget, iBestSol, minDepthForL1, maxDepthForL1) {|elmt1|
-              newDepth = elmt1.depth + elmt2.depth + 1
-                    
-              if iMaxDepth.currentMaxDepth > newDepth
+            if iMinDepth > minDepthForL2alone
+              minDepthForL2alone = iMinDepth
+            end
 
-                newNode = Node.new
-                newNode.depth = newDepth
-                newNode.leftNode = elmt1
-                newNode.rightNode = elmt2
-                val1 = elmt1.value
-                val2 = elmt2.value
+            algo(l2, l2_size, minDepthForL2alone, iMaxDepth, &block)
 
-                if elmt2.class != Node or elmt2.operation != :Add
-                  newNode.value=val1 + val2
-                  newNode.operation = :Add
-                  checkNode(newNode,iTarget,iBestSol,iMaxDepth.overallMaxDepth)
-                  block.call(newNode)
-                            
-                  if val2 > val1
-                    newNode.value=val2 - val1
-                    
-                    newNode.leftNode = elmt2
-                    newNode.rightNode = elmt1
-                    newNode.operation = :Minus
-                    
-                    checkNode(newNode,iTarget,iBestSol,iMaxDepth.overallMaxDepth)
-                    block.call(newNode)
-                    newNode.leftNode = elmt1
-                    newNode.rightNode = elmt2
-                  end
-                end
-          
-                if val1 > val2
-                  if elmt1.class != Node or elmt1.operation != :Add
-                    newNode.value=val1 - val2
-                    newNode.operation = :Minus
-                    checkNode(newNode,iTarget,iBestSol,iMaxDepth.overallMaxDepth)
-                    block.call(newNode)
-                  end
-                end
-
-                if elmt2.class != Node or elmt2.operation != :Mult
-                  if (val1 > 1 and val2 > 1)
-                    newNode.value=val1 * val2
-                    newNode.operation = :Mult
-                    
-                    checkNode(newNode,iTarget,iBestSol,iMaxDepth.overallMaxDepth)
-                    block.call(newNode)
-                  end
+            # yield all combination of elements of l1 X l2
             
-                  if(val2 > val1 and val1 > 1 and (val2 % val1) == 0)
-                    newNode.value=val2 / val1
-                    newNode.leftNode = elmt2
-                    newNode.rightNode = elmt1
-                    newNode.operation = :Divi
-                    
-                    checkNode(newNode,iTarget,iBestSol,iMaxDepth.overallMaxDepth)
-                    block.call(newNode)
-                    newNode.leftNode = elmt1
-                    newNode.rightNode = elmt2
-                  end
-                end
+            maxDepthForL1 = iMaxDepth.childA
+            if not maxDepthForL1
+              maxDepthForL1 = MaxDepth.new(iMaxDepth.currentMaxDepth,
+                                           0)
+              iMaxDepth.childA = maxDepthForL1
+            else
+              maxDepthForL1.maxDepth=iMaxDepth.currentMaxDepth
+              maxDepthForL1.delta=0
+            end
 
-          
-                if (elmt1.class != Node or elmt1.operation != :Mult)
-                  if( val1 > val2 and val2 > 1 and (val1 % val2) == 0)
-                    newNode.value=val1 / val2
-                    newNode.operation = :Divi
-                    
-                    checkNode(newNode,iTarget,iBestSol,iMaxDepth.overallMaxDepth)
-                    block.call(newNode)
-                  end
-                end
+            maxDepthForL2 = iMaxDepth.childB
+            if not maxDepthForL2
+              maxDepthForL2 = MaxDepth.new(iMaxDepth.currentMaxDepth,
+                                           0)
+              iMaxDepth.childB = maxDepthForL2
+            else
+              maxDepthForL2.maxDepth=iMaxDepth.currentMaxDepth
+              maxDepthForL2.delta=0
+            end
+            
+     
+            algo(l2, l2_size, minDepthForL2, maxDepthForL2) {|elmt2|
+              # MinDepth = minDepthForL1 + 1 + depthOfL2Elmt          
+              minDepthForL1 = iMinDepth - 1 - elmt2.depth
+              if minDepthForL1 < 0
+                minDepthForL1 = 0
               end
-            }
-          }        
-        end
-      }
-    end 
-  end
 
-  def Le_Compte_Est_Bon.run(iL,iTarget)
-    aBestSol = BestSolution.new
+              # MaxDepth = maxDepthForL1 + 1 + depthOfL2Elmt
+              maxDepthForL1.delta = 1 + elmt2.depth
+              
+              algo(l1, l1_size, minDepthForL1, maxDepthForL1) {|elmt1|
+                newDepth = elmt1.depth + elmt2.depth + 1
+                
+                if iMaxDepth.currentMaxDepth > newDepth
 
-    compteur = 0
-    l=arrayToSingleChained(iL.collect {|elmt| FinalNode.new(elmt)})
+                  newNode = Node.new
+                  newNode.depth = newDepth
+                  newNode.leftNode = elmt1
+                  newNode.rightNode = elmt2
+                  val1 = elmt1.value
+                  val2 = elmt2.value
+                  
+                  if elmt2.class != Node or elmt2.operation != :Add
+                    newNode.value=val1 + val2
+                    newNode.operation = :Add
+                    checkNode(newNode)
+                    block.call(newNode)
+                    
+                    if val2 > val1
+                      newNode.value=val2 - val1
+                      
+                      newNode.leftNode = elmt2
+                      newNode.rightNode = elmt1
+                      newNode.operation = :Minus
+                      
+                      checkNode(newNode)
+                      block.call(newNode)
+                      newNode.leftNode = elmt1
+                      newNode.rightNode = elmt2
+                    end
+                  end
+                  
+                  if val1 > val2
+                    if elmt1.class != Node or elmt1.operation != :Add
+                      newNode.value=val1 - val2
+                      newNode.operation = :Minus
+                      checkNode(newNode)
+                      block.call(newNode)
+                    end
+                  end
+                  
+                  if elmt2.class != Node or elmt2.operation != :Mult
+                    if (val1 > 1 and val2 > 1)
+                      newNode.value=val1 * val2
+                      newNode.operation = :Mult
+                      
+                      checkNode(newNode)
+                      block.call(newNode)
+                    end
+                    
+                    if(val2 > val1 and val1 > 1 and (val2 % val1) == 0)
+                      newNode.value=val2 / val1
+                      newNode.leftNode = elmt2
+                      newNode.rightNode = elmt1
+                      newNode.operation = :Divi
+                      
+                      checkNode(newNode)
+                      block.call(newNode)
+                      newNode.leftNode = elmt1
+                      newNode.rightNode = elmt2
+                    end
+                  end
+
+                  
+                  if (elmt1.class != Node or elmt1.operation != :Mult)
+                    if( val1 > val2 and val2 > 1 and (val1 % val2) == 0)
+                      newNode.value=val1 / val2
+                      newNode.operation = :Divi
+                      
+                      checkNode(newNode)
+                      block.call(newNode)
+                    end
+                  end
+                end
+              }
+            }        
+          end
+        }
+      end 
+    end
+    private :algo
     
-    maxDepth = MaxDepth.new
-
-    Le_Compte_Est_Bon.algo(l,l.size(), iTarget, aBestSol, 0,maxDepth) {|elmt|
-          compteur = compteur+1 }
-     #puts "#{elmt}"}
-    #to-do: cleaning; remove "compteur" variables
-    puts compteur
-    puts $compteur2
-
-    if aBestSol.bestSolution
-      puts "#{iTarget} = #{aBestSol.bestSolution}"
-    else
-      puts "No Solution"
+    def run(iL)
+      compteur = 0
+      l=Le_Compte_Est_Bon.arrayToSingleChained(iL.collect {|elmt| FinalNode.new(elmt)})
+      l.each {|i| checkNode(i)}
+      
+      algo(l,l.size(), 0,@overallMaxDepth) {|elmt|
+        compteur = compteur+1 }
+      #puts "#{elmt}"}
+      #to-do: cleaning; remove "compteur" variables
+      puts compteur
+      puts $compteur2
+      
+      if @bestSol.bestSolution
+        puts "#{@target} = #{@bestSol.bestSolution}"
+      else
+        puts "No Solution"
+      end
+      
+      return @bestSol.bestSolution
     end
   end
+
+  def Le_Compte_Est_Bon.algoNew(iTarget)
+    Algo.new(iTarget)
+  end
+
+
 
 end #end of the module
 
@@ -499,5 +504,6 @@ ARGV.each {|elmt|
 
 target = inputNumbers.pop
 
-Le_Compte_Est_Bon.run(inputNumbers,target)
+algo = Le_Compte_Est_Bon.algoNew(target)
+algo.run(inputNumbers)
 
