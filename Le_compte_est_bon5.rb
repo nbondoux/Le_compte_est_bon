@@ -297,6 +297,7 @@ module Le_Compte_Est_Bon
     private :checkNode
     
     def algo (iL, iLSize, iMinDepth, iMaxDepth, &block)
+      iMinDepth = 0 if (iMinDepth < 0)
       currentMaxDepth = iMaxDepth.currentMaxDepth
       
       if iL.empty or iLSize < iMinDepth + 1 or currentMaxDepth <= iMinDepth
@@ -314,61 +315,53 @@ module Le_Compte_Est_Bon
           if not l1.empty
             l1_size = l1.size
             l2_size = l2.size
-          
-            # yield all eligible elements of l1
-            algo(l1, l1_size, iMinDepth, iMaxDepth, &block)
 
-            minDepthForL2 = 0
-
-            # yield all eligible elements of l2
-            
-            if (l1_size + 1 < l2_size)
-              minDepthForL2 = l2_size - 1
-            end
-
-            minDepthForL2alone = minDepthForL2
-
-            if iMinDepth > minDepthForL2alone
-              minDepthForL2alone = iMinDepth
-            end
-
-            algo(l2, l2_size, minDepthForL2alone, iMaxDepth, &block)
-
-            # yield all combination of elements of l1 X l2
-            
             maxDepthForL1 = iMaxDepth.childA
             if not maxDepthForL1
               maxDepthForL1 = MaxDepth.new(iMaxDepth.currentMaxDepth,
-                                           1)
+                                           0)
               iMaxDepth.childA = maxDepthForL1
             else
               maxDepthForL1.maxDepth=iMaxDepth.currentMaxDepth
-              maxDepthForL1.delta=1
+              maxDepthForL1.delta=0
             end
 
             maxDepthForL2 = iMaxDepth.childB
             if not maxDepthForL2
               maxDepthForL2 = MaxDepth.new(iMaxDepth.currentMaxDepth,
-                                           1)
+                                           0)
               iMaxDepth.childB = maxDepthForL2
             else
               maxDepthForL2.maxDepth=iMaxDepth.currentMaxDepth
-              maxDepthForL2.delta=1
+              maxDepthForL2.delta=0
             end
 
+          
+            # yield all eligible elements of l1
+            minDepthForL1 = l1_size - 1
+            minDepthForL1 = iMinDepth if iMinDepth > minDepthForL1
+            
+            algo(l1, l1_size, minDepthForL1, maxDepthForL1, &block)
+
+
+            minDepthForL2 = l2_size - 1
+            minDepthForL2 = iMinDepth if iMinDepth > minDepthForL2
+
+            algo(l2, l2_size, minDepthForL2, maxDepthForL2, &block)
+
+            # yield all combination of elements of l1 X l2
             newNode = Node.new
-                 
-            algo(l2, l2_size, minDepthForL2, maxDepthForL2) {|elmt2|
+
+            maxDepthForL2.delta=1                 
+            algo(l2, l2_size, l2_size - 1, maxDepthForL2) {|elmt2|
               # MinDepth = minDepthForL1 + 1 + depthOfL2Elmt          
               minDepthForL1 = iMinDepth - 1 - elmt2.depth
-              if minDepthForL1 < 0
-                minDepthForL1 = 0
-              end
+ 
 
               # MaxDepth = maxDepthForL1 + 1 + depthOfL2Elmt
               maxDepthForL1.delta = 1 + elmt2.depth
               
-              algo(l1, l1_size, minDepthForL1, maxDepthForL1) {|elmt1|
+              algo(l1, l1_size, l1_size - 1, maxDepthForL1) {|elmt1|
                 newDepth = elmt1.depth + elmt2.depth + 1
                 
                 if iMaxDepth.currentMaxDepth > newDepth
@@ -383,7 +376,7 @@ module Le_Compte_Est_Bon
                   newNode.value=val1 + val2
                   newNode.operation = :Add
                   checkNode(newNode)
-                  block.call(newNode)
+                  yield newNode
                     
                   if val2 > val1
                     if elmt2.class != Node or elmt2.operation != :Add
@@ -394,7 +387,7 @@ module Le_Compte_Est_Bon
                       newNode.operation = :Minus
                       
                       checkNode(newNode)
-                      block.call(newNode)
+                      yield newNode
                       newNode.leftNode = elmt1
                       newNode.rightNode = elmt2
                     end
@@ -405,7 +398,7 @@ module Le_Compte_Est_Bon
                       newNode.value=val1 - val2
                       newNode.operation = :Minus
                       checkNode(newNode)
-                      block.call(newNode)
+                      yield newNode
                     end
                   end
                   
@@ -414,7 +407,7 @@ module Le_Compte_Est_Bon
                     newNode.operation = :Mult
                     
                     checkNode(newNode)
-                    block.call(newNode)
+                    yield newNode
                   end
                   
                   if elmt2.class != Node or elmt2.operation != :Mult  
@@ -425,7 +418,7 @@ module Le_Compte_Est_Bon
                       newNode.operation = :Divi
                       
                       checkNode(newNode)
-                      block.call(newNode)
+                      yield newNode
                       newNode.leftNode = elmt1
                       newNode.rightNode = elmt2
                     end
@@ -438,7 +431,7 @@ module Le_Compte_Est_Bon
                       newNode.operation = :Divi
                       
                       checkNode(newNode)
-                      block.call(newNode)
+                      yield newNode
                     end
                   end
                 end
