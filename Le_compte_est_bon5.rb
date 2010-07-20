@@ -11,11 +11,11 @@
 $compteur2=0
 module Le_Compte_Est_Bon
   
-  class SingleChainedListAbstract
+  class SinglyLinkedListAbstract
     attr_reader :next
     attr_writer :next
     
-    class SingleChainedListEnd
+    class SinglyLinkedListEnd
       def empty
         true
       end
@@ -32,13 +32,13 @@ module Le_Compte_Est_Bon
       end
     end
 
-    @@emptyList = SingleChainedListEnd.new
+    @@emptyList = SinglyLinkedListEnd.new
 
     def initialize
       @next = @@emptyList
     end
     
-    def SingleChainedListAbstract.emptyList
+    def SinglyLinkedListAbstract.emptyList
       @@emptyList
     end    
     
@@ -62,7 +62,7 @@ module Le_Compte_Est_Bon
     
   end
 
-  class SingleChainedList < SingleChainedListAbstract
+  class SinglyLinkedList < SinglyLinkedListAbstract
     attr_reader :content
     attr_writer :content
 
@@ -82,10 +82,10 @@ module Le_Compte_Est_Bon
     end   
   end
   
-  def Le_Compte_Est_Bon.arrayToSingleChained a
-    l = SingleChainedList.emptyList
+  def Le_Compte_Est_Bon.arrayToSinglyLinked a
+    l = SinglyLinkedList.emptyList
     a.reverse_each {|elmt|
-      node = SingleChainedList.new
+      node = SinglyLinkedList.new
       node.content = elmt
       node.next = l
       l = node
@@ -99,9 +99,9 @@ module Le_Compte_Est_Bon
 
   def Le_Compte_Est_Bon.getSubCombinationsFixedL1Size(iL,iL1Size, iLSize)
     if iL1Size == 0
-      yield SingleChainedList.emptyList,iL
+      yield SinglyLinkedList.emptyList,iL
     else
-      duplicate_head = SingleChainedList.new
+      duplicate_head = SinglyLinkedList.new
       duplicate_head.content = iL.content
       
       #all combinations that contain head of list
@@ -129,7 +129,7 @@ module Le_Compte_Est_Bon
       getSubCombinationsFixedL1Size(iL,iL1Size,iLSize,&block)
     else
       # pop the first element of iL
-      duplicate_head = SingleChainedList.new
+      duplicate_head = SinglyLinkedList.new
       duplicate_head.content = iL.content
       # and get all the combinations where iL1 contains this element
       getSubCombinationsFixedL1Size(iL.next,iL1Size-1,iLSize-1) {|sl1,sl2|
@@ -314,7 +314,7 @@ module Le_Compte_Est_Bon
       
       if iLSize < iMinLength or currentMaxLength <= iMinLength
         # if l.size is one
-      elsif iL.next == SingleChainedList.emptyList
+      elsif iL.next == SinglyLinkedList.emptyList
         elmt = iL.content
         #optim:
         #length of iL elemts should be 1
@@ -330,23 +330,20 @@ module Le_Compte_Est_Bon
 
             maxLengthForL1 = iMaxLength.childA
             if not maxLengthForL1
-              maxLengthForL1 = MaxLength.new(iMaxLength.currentMaxLength,
-                                           0)
+              maxLengthForL1 = MaxLength.new(iMaxLength.currentMaxLength)
               iMaxLength.childA = maxLengthForL1
             else
               maxLengthForL1.maxLength=iMaxLength.currentMaxLength
-              maxLengthForL1.delta=0
             end
 
             maxLengthForL2 = iMaxLength.childB
             if not maxLengthForL2
-              maxLengthForL2 = MaxLength.new(iMaxLength.currentMaxLength,
-                                           0)
+              maxLengthForL2 = MaxLength.new(iMaxLength.currentMaxLength)
               iMaxLength.childB = maxLengthForL2
             else
               maxLengthForL2.maxLength=iMaxLength.currentMaxLength
-              maxLengthForL2.delta=0
             end
+
 
 
             # note that the set of  "l1" and "l2" generated from l is the 
@@ -356,10 +353,14 @@ module Le_Compte_Est_Bon
             # of size N" part of the algorithm described on top of the file
 
             # return all elements of length l1_size
+            maxLengthForL1.delta = 0
             algo(l1, l1_size, l1_size, maxLengthForL1, &block) if (iMinLength <= l1_size)
 
             # return all elements of length l2_size
+            maxLengthForL2.delta = 0
             algo(l2, l2_size, l2_size, maxLengthForL2, &block) if (iMinLength <= l2_size)
+
+
 
             # yield all combination of elements of l1 X l2
             # it is generate "the values made of combinations by an operation
@@ -369,88 +370,87 @@ module Le_Compte_Est_Bon
 
             newNode = Node.new
 
-            maxLengthForL2.delta=1                 
+            maxLengthForL1.delta=1
+            algo(l1, l1_size, l1_size, maxLengthForL1) {|elmt1|
+              break if iMaxLength.currentMaxLength <= iLSize
 
-            algo(l2, l2_size, l2_size, maxLengthForL2) {|elmt2|
-              # MaxLength = maxLengthForL1 + lengthOfL2Elmt
-              maxLengthForL1.delta = elmt2.length
-              
-              algo(l1, l1_size, l1_size, maxLengthForL1) {|elmt1|
-                newLength = elmt1.length + elmt2.length
+              # MaxLength = lengthOfL1Elmt + maxLengthForL2
+              maxLengthForL2.delta = elmt1.length
+
+              algo(l2, l2_size, l2_size, maxLengthForL2) {|elmt2|
+                break if iMaxLength.currentMaxLength <= iLSize
+
+                newLength = elmt1.length + elmt2.length              
                 
-                if iMaxLength.currentMaxLength > newLength
-
-                  newNode.length = newLength
-                  newNode.leftNode = elmt1
-                  newNode.rightNode = elmt2
-                  val1 = elmt1.value
-                  val2 = elmt2.value
+                newNode.length = newLength
+                newNode.leftNode = elmt1
+                newNode.rightNode = elmt2
+                val1 = elmt1.value
+                val2 = elmt2.value
+                
+                newNode.value=val1 + val2
+                newNode.operation = :Add
+                checkNode(newNode)
+                yield newNode
+                
+                if val2 > val1
+                  if elmt2.class != Node or elmt2.operation != :Add
+                    newNode.value=val2 - val1
+                    
+                    newNode.leftNode = elmt2
+                    newNode.rightNode = elmt1
+                    newNode.operation = :Minus
+                    
+                    checkNode(newNode)
+                    yield newNode
+                    newNode.leftNode = elmt1
+                    newNode.rightNode = elmt2
+                  end
+                end
+                
+                if val1 > val2
+                  if elmt1.class != Node or elmt1.operation != :Add
+                    newNode.value=val1 - val2
+                    newNode.operation = :Minus
+                    checkNode(newNode)
+                    yield newNode
+                  end
+                end
+                
+                if (val1 > 1 and val2 > 1)
+                  newNode.value=val1 * val2
+                  newNode.operation = :Mult
                   
-     
-                  newNode.value=val1 + val2
-                  newNode.operation = :Add
                   checkNode(newNode)
                   yield newNode
+                end
+                
+                if elmt2.class != Node or elmt2.operation != :Mult  
+                  if(val2 > val1 and val1 > 1 and (val2 % val1) == 0)
+                    newNode.value=val2 / val1
+                    newNode.leftNode = elmt2
+                    newNode.rightNode = elmt1
+                    newNode.operation = :Divi
                     
-                  if val2 > val1
-                    if elmt2.class != Node or elmt2.operation != :Add
-                      newNode.value=val2 - val1
-                      
-                      newNode.leftNode = elmt2
-                      newNode.rightNode = elmt1
-                      newNode.operation = :Minus
-                      
-                      checkNode(newNode)
-                      yield newNode
-                      newNode.leftNode = elmt1
-                      newNode.rightNode = elmt2
-                    end
+                    checkNode(newNode)
+                    yield newNode
+                    newNode.leftNode = elmt1
+                    newNode.rightNode = elmt2
                   end
-                  
-                  if val1 > val2
-                    if elmt1.class != Node or elmt1.operation != :Add
-                      newNode.value=val1 - val2
-                      newNode.operation = :Minus
-                      checkNode(newNode)
-                      yield newNode
-                    end
-                  end
-                  
-                  if (val1 > 1 and val2 > 1)
-                    newNode.value=val1 * val2
-                    newNode.operation = :Mult
+                end
+                
+                
+                if (elmt1.class != Node or elmt1.operation != :Mult)
+                  if( val1 > val2 and val2 > 1 and (val1 % val2) == 0)
+                    newNode.value=val1 / val2
+                    newNode.operation = :Divi
                     
                     checkNode(newNode)
                     yield newNode
                   end
-                  
-                  if elmt2.class != Node or elmt2.operation != :Mult  
-                    if(val2 > val1 and val1 > 1 and (val2 % val1) == 0)
-                      newNode.value=val2 / val1
-                      newNode.leftNode = elmt2
-                      newNode.rightNode = elmt1
-                      newNode.operation = :Divi
-                      
-                      checkNode(newNode)
-                      yield newNode
-                      newNode.leftNode = elmt1
-                      newNode.rightNode = elmt2
-                    end
-                  end
-
-                  
-                  if (elmt1.class != Node or elmt1.operation != :Mult)
-                    if( val1 > val2 and val2 > 1 and (val1 % val2) == 0)
-                      newNode.value=val1 / val2
-                      newNode.operation = :Divi
-                      
-                      checkNode(newNode)
-                      yield newNode
-                    end
-                  end
                 end
               }
-            }        
+            }      
           end
         }
       end 
@@ -459,7 +459,7 @@ module Le_Compte_Est_Bon
     
     def run(iL)
       compteur = 0
-      l=Le_Compte_Est_Bon.arrayToSingleChained(iL.collect {|elmt| FinalNode.new(elmt)})
+      l=Le_Compte_Est_Bon.arrayToSinglyLinked(iL.collect {|elmt| FinalNode.new(elmt)})
       l.each {|i| checkNode(i)}
       @overallMaxLength.maxLength = l.size + 1
       algo(l,l.size(), 1,@overallMaxLength) {|elmt|
