@@ -93,11 +93,47 @@ module Le_Compte_Est_Bon
     return l
   end
 
+  # call the block for all possible l1 where
+  # l1 is made of iL1Size elements of iL
+
+  def Le_Compte_Est_Bon.getSubCombinationsFixedLSize(iL,iL1Size, iLSize,&block)
+    if iL1Size == 0
+      yield SinglyLinkedList.emptyList
+    else    
+      duplicate_head = SinglyLinkedList.new
+      duplicate_head.content = iL.content
+
+      #all combinations that contain head of list
+      getSubCombinationsFixedLSize(iL.next,iL1Size-1,iLSize-1) {|sl|
+        duplicate_head.next = sl
+        yield duplicate_head
+      }
+
+      #all combinations that do not contain head of list
+      if (iL1Size < iLSize)
+        getSubCombinationsFixedLSize(iL.next,iL1Size,iLSize-1,&block)
+      end
+    end
+  end
+
+  # call the block for all possible l1 where l1 is made n elements of iL,
+  # iMinSize <= n <= iLSize
+  # l1 are returned by growing order of n
+
+  def Le_Compte_Est_Bon.getSubCombinations(iL,iLSize,iMinSize,&block)
+    n = iMinSize
+    while n <= iLSize
+      getSubCombinationsFixedLSize(iL,n,iLSize,&block)
+      n = n + 1
+    end
+  end
+
+
   # call the block for all possible couple (l1,l2) where
   # l1 is made of iL1Size elements of iL and l2 contains the complementary elmts
   # of iL
 
-  def Le_Compte_Est_Bon.getSubCombinationsFixedL1Size(iL,iL1Size, iLSize)
+  def Le_Compte_Est_Bon.getSubCombinationCouplesFixedL1Size(iL,iL1Size, iLSize)
     if iL1Size == 0
       yield SinglyLinkedList.emptyList,iL
     else
@@ -105,13 +141,13 @@ module Le_Compte_Est_Bon
       duplicate_head.content = iL.content
       
       #all combinations that contain head of list
-      getSubCombinationsFixedL1Size(iL.next,iL1Size-1,iLSize-1) {|sl1,sl2|
+      getSubCombinationCouplesFixedL1Size(iL.next,iL1Size-1,iLSize-1) {|sl1,sl2|
         duplicate_head.next = sl1
         yield duplicate_head,sl2
       }
       #all combinations that do not contain head of list
-      if(iL1Size <= iLSize - 1)
-        getSubCombinationsFixedL1Size(iL.next,iL1Size,iLSize-1) {|sl1,sl2|
+      if (iL1Size < iLSize)
+        getSubCombinationCouplesFixedL1Size(iL.next,iL1Size,iLSize-1) {|sl1,sl2|
           duplicate_head.next = sl2
           yield sl1,duplicate_head
         }
@@ -120,19 +156,19 @@ module Le_Compte_Est_Bon
   end
 
   # return all non_ordered subcombinations of iL where iL1 has size
-  # iL1Size; it differs from getSubCombinationsFixedL1Size, as
+  # iL1Size; it differs from getSubCombinationCouplesFixedL1Size, as
   # if iL1Size*2 == iLSize, we must not return (['a'],['b'])  and (['b','a'])
   
 
-  def Le_Compte_Est_Bon.getSubCombinationsFixedL1Size_bis(iL,iL1Size, iLSize,&block)
+  def Le_Compte_Est_Bon.getSubCombinationCouplesFixedL1Size_bis(iL,iL1Size, iLSize,&block)
     if iL1Size * 2 != iLSize
-      getSubCombinationsFixedL1Size(iL,iL1Size,iLSize,&block)
+      getSubCombinationCouplesFixedL1Size(iL,iL1Size,iLSize,&block)
     else
       # pop the first element of iL
       duplicate_head = SinglyLinkedList.new
       duplicate_head.content = iL.content
       # and get all the combinations where iL1 contains this element
-      getSubCombinationsFixedL1Size(iL.next,iL1Size-1,iLSize-1) {|sl1,sl2|
+      getSubCombinationCouplesFixedL1Size(iL.next,iL1Size-1,iLSize-1) {|sl1,sl2|
         duplicate_head.next = sl1
         block.call(duplicate_head,sl2)
       }       
@@ -140,10 +176,10 @@ module Le_Compte_Est_Bon
   end
 
   #returns all non-ordered couple of sub combinations of l!!!
-  def Le_Compte_Est_Bon.getAllSubCombinations(iL,iLSize,&block)
+  def Le_Compte_Est_Bon.getAllSubCombinationCouples(iL,iLSize,&block)
     i = 0;
     while i*2 <= iLSize
-      getSubCombinationsFixedL1Size_bis(iL,i,iLSize,&block)
+      getSubCombinationCouplesFixedL1Size_bis(iL,i,iLSize,&block)
       i=i+1
     end
   end
@@ -221,164 +257,73 @@ module Le_Compte_Est_Bon
   end
  
   class BestSolution
-    attr_reader :length, :bestSolution
-    
-    def initialize(iBestSolution=nil)
-      if iBestSolution
-        @bestSolution = iBestSolution
-        @length = iBestSolution.length
-      else
-        @bestSolution = nil
-        @length = nil
-      end
-    end
-    def bestSolution= (iBestSolution)
-      @bestSolution = iBestSolution
-      @length = iBestSolution.length
-    end
-  end
-
-  #the tree of MaxLength represents maximum authorized length
-  #from top of algo (linked by overallMaxLength)
-  #to the algos in length (leafs of the tree)
-  #maxLength at a level is always calculated as the one of the level
-  #above minus a delta; the tree structure is useful to propagate in all the
-  #levels the consequencies of finding a new solution
-  
-  class MaxLength
-    attr_reader :delta,:maxLength,:childA,:childB
-    attr_writer :childA,:childB
-
-    def initialize (iMaxLength=99999,iDelta=0)
-      @childA = nil
-      @childB = nil
-      @maxLength = iMaxLength
-      @delta = iDelta
-      @maxLengthMinusDelta = iMaxLength - iDelta
-    end
-    
-    def maxLength=(iMaxLength)
-      @maxLength=iMaxLength
-      @maxLengthMinusDelta=iMaxLength - @delta
-    end
-    
-    def delta=(iDelta)
-      @delta=iDelta
-      @maxLengthMinusDelta=@maxLength - iDelta
-    end
-    
-    def propagateMaxLength
-      if @childA
-        @childA.maxLength=@maxLengthMinusDelta
-        @childA.propagateMaxLength
-      end
-      if @childB
-        @childB.maxLength=@maxLengthMinusDelta
-        @childB.propagateMaxLength
-      end
-    end
-    
-    def currentMaxLength
-      @maxLengthMinusDelta
-    end
+    attr_reader :bestSolution
+    attr_writer :bestSolution
   end
 
   class Algo
-    attr_reader :target,:bestSol,:overallMaxLength
+    attr_reader :target,:bestSolution
 
     def initialize (iTarget)
       @target = iTarget
-      @bestSol = BestSolution.new
-      @overallMaxLength = MaxLength.new
+      @bestSolution = nil
     end
 
     def checkNode(iNode)
       $compteur2 = $compteur2 + 1
 
       if iNode.value == @target
-        if (not @bestSol.bestSolution) or iNode.length < @bestSol.length
-          #propagte new max-length constraints to all the algorithm
-          @overallMaxLength.maxLength=iNode.length
-          @overallMaxLength.propagateMaxLength
-          
-          @bestSol.bestSolution=iNode.duplicateTree
-          puts "#{@target} = #{@bestSol.bestSolution}; #{@bestSol.length - 1}"
-        end
+        @bestSolution=iNode.duplicateTree
+        puts "#{@target} = #{iNode}; #{iNode.length - 1}"
       end
     end
     private :checkNode
     
-    def algo (iL, iLSize, iMinLength, iMaxLength, &block)
+    def algo (iL, iLSize, iMinLength, &block)
       iMinLength = 1 if (iMinLength < 1)
-      currentMaxLength = iMaxLength.currentMaxLength
       
-      if iLSize < iMinLength or currentMaxLength <= iMinLength
-        # if l.size is one
+      if iLSize < iMinLength
       elsif iL.next == SinglyLinkedList.emptyList
+        # if l.size is one
+
         elmt = iL.content
         #optim:
         #length of iL elemts should be 1
         # so we replace here elmt.length with 1
-        if 1 >= iMinLength and 1 < currentMaxLength
+        if 1 >= iMinLength
           yield elmt
         end
       else
-        Le_Compte_Est_Bon.getAllSubCombinations(iL,iLSize) {|l1,l2|
+
+        # this "algo" calls are used for the 
+        # "the values made of N numbers generated by each of its sublists
+        # of size N" part of the algorithm described on top of the file
+
+        Le_Compte_Est_Bon.getSubCombinations(iL,iLSize - 1,iMinLength) {|sl|
+          break if @bestSolution
+          sl_size = sl.size
+          algo(sl, sl_size, sl_size, &block)
+        }
+        
+        # Let's yield all combination of elements of l1 X l2
+        # it is generate "the values made of combinations by an operation
+        # of the values generated by the couple of lists whose combined
+        # total number of elements is L" part of the algorithm described
+        # on top of the file
+        
+        Le_Compte_Est_Bon.getAllSubCombinationCouples(iL,iLSize) {|l1,l2|
+          break if @bestSolution
           if not l1.empty
             l1_size = l1.size
             l2_size = l2.size
-
-            maxLengthForL1 = iMaxLength.childA
-            if not maxLengthForL1
-              maxLengthForL1 = MaxLength.new(iMaxLength.currentMaxLength)
-              iMaxLength.childA = maxLengthForL1
-            else
-              maxLengthForL1.maxLength=iMaxLength.currentMaxLength
-            end
-
-            maxLengthForL2 = iMaxLength.childB
-            if not maxLengthForL2
-              maxLengthForL2 = MaxLength.new(iMaxLength.currentMaxLength)
-              iMaxLength.childB = maxLengthForL2
-            else
-              maxLengthForL2.maxLength=iMaxLength.currentMaxLength
-            end
-
-
-
-            # note that the set of  "l1" and "l2" generated from l is the 
-            # set of sublists of l
-            # these two "algo" calls are used for the 
-            # "the values made of N numbers generated by each of its sublists
-            # of size N" part of the algorithm described on top of the file
-
-            # return all elements of length l1_size
-            maxLengthForL1.delta = 0
-            algo(l1, l1_size, l1_size, maxLengthForL1, &block) if (iMinLength <= l1_size)
-
-            # return all elements of length l2_size
-            maxLengthForL2.delta = 0
-            algo(l2, l2_size, l2_size, maxLengthForL2, &block) if (iMinLength <= l2_size)
-
-
-
-            # yield all combination of elements of l1 X l2
-            # it is generate "the values made of combinations by an operation
-            # of the values generated by the couple of lists whose combined
-            # total number of elements is L" part of the algorithm described
-            # on top of the file
-
+            
             newNode = Node.new
 
-            maxLengthForL1.delta=1
-            algo(l1, l1_size, l1_size, maxLengthForL1) {|elmt1|
-              break if iMaxLength.currentMaxLength <= iLSize
+            algo(l1, l1_size, l1_size) {|elmt1|
+              break if @bestSolution
 
-              # MaxLength = lengthOfL1Elmt + maxLengthForL2
-              maxLengthForL2.delta = elmt1.length
-
-              algo(l2, l2_size, l2_size, maxLengthForL2) {|elmt2|
-                break if iMaxLength.currentMaxLength <= iLSize
+              algo(l2, l2_size, l2_size) {|elmt2|
+                break if @bestSolution
 
                 newLength = elmt1.length + elmt2.length              
                 
@@ -461,21 +406,20 @@ module Le_Compte_Est_Bon
       compteur = 0
       l=Le_Compte_Est_Bon.arrayToSinglyLinked(iL.collect {|elmt| FinalNode.new(elmt)})
       l.each {|i| checkNode(i)}
-      @overallMaxLength.maxLength = l.size + 1
-      algo(l,l.size(), 1,@overallMaxLength) {|elmt|
+      algo(l,l.size(), 1) {|elmt|
         compteur = compteur+1 }
       #puts "#{elmt}"}
       #to-do: cleaning; remove "compteur" variables
       puts compteur
       puts $compteur2
       
-      if @bestSol.bestSolution
-        puts "#{@target} = #{@bestSol.bestSolution}"
+      if @bestSolution
+        puts "#{@target} = #{@bestSolution}"
       else
         puts "No Solution"
       end
       
-      return @bestSol.bestSolution
+      return @bestSolution
     end
   end
 
