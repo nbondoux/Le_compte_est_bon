@@ -355,7 +355,7 @@ module Le_Compte_Est_Bon
                 
                 
                 if (elmt1.class != Node or elmt1.operation != :Mult)
-                  if( val1 > val2 and val2 > 1 and (val1 % val2) == 0)
+                  if( val1 >= val2 and val2 > 1 and (val1 % val2) == 0)
                     newNode.value=val1 / val2
                     newNode.operation = :Divi
                     
