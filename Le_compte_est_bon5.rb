@@ -186,11 +186,9 @@ module Le_Compte_Est_Bon
 
 
   class Node
-    attr_reader :leftNode, :rightNode, :operation, :value, :length
-    attr_writer :leftNode, :rightNode, :operation, :value, :length
+    attr_reader :leftNode, :rightNode, :operation, :value
+    attr_writer :leftNode, :rightNode, :operation, :value
     
-    # length is the number of numbers in a formula
-
     def duplicateTree
       a = clone
       a.leftNode =@leftNode.duplicateTree
@@ -239,10 +237,6 @@ module Le_Compte_Est_Bon
       @value = iValue
     end
 
-    def length
-      return 1
-    end
-
     def operationPriority
        return 100
     end
@@ -269,7 +263,6 @@ module Le_Compte_Est_Bon
 
       if iNode.value == @target
         @bestSolution=iNode.duplicateTree
-        puts "#{@target} = #{iNode}; #{iNode.length - 1}"
       end
     end
     private :checkNode
@@ -302,9 +295,6 @@ module Le_Compte_Est_Bon
               algo_l_size(l2, l2_size) {|elmt2|
                 break if @bestSolution
 
-                newLength = elmt1.length + elmt2.length              
-                
-                newNode.length = newLength
                 newNode.leftNode = elmt1
                 newNode.rightNode = elmt2
                 val1 = elmt1.value
