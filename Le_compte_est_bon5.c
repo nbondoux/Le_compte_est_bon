@@ -73,9 +73,6 @@ NB_BaseGenerator_t* getFreeGenerator (void (*iContextCreator) (),
     generator -> freePool = ioFreeGeneratorPool;
 
     // should lock by mutex here
-    generator -> nextFree = ioFreeGeneratorPool -> headOfList;
-    ioFreeGeneratorPool -> headOfList = generator;
-
     generator -> next = ioGeneratorPool -> headOfList;
     ioGeneratorPool -> headOfList = generator;
 
@@ -115,13 +112,12 @@ void run_gen (TestGenerator_t* iGen, int i) {
   // yield i;
   iGen -> yieldedValue = i;
 
-  // go back to outer context
-  ucontext_t* outerContext = iGen -> super.nextContext;
-  ucontext_t genContext;
-  iGen -> super.nextContext = &genContext;
-  swapcontext(&genContext, outerContext);
-
   if (i!=10) {
+    // go back to outer context
+    ucontext_t* outerContext = iGen -> super.nextContext;
+    ucontext_t genContext;
+    iGen -> super.nextContext = &genContext;
+    swapcontext(&genContext, outerContext);
     run_gen (iGen, i+1);
   }
 }
@@ -162,18 +158,30 @@ void loop_gen () {
 
 
 
-void use_gen (TestGenerator_t* iGen, int n) {
+void use_gen (TestGenerator_t* iGen1, TestGenerator_t* iGen2, int n) {
   if (n == 0)
     return;
 
-  // let yield a value
-  ucontext_t* genContext = iGen -> super.nextContext;
   ucontext_t innerContext;
-  iGen -> super.nextContext = &innerContext;
-  swapcontext(&innerContext, genContext);
-  printf ("%d %d\n",n,iGen -> yieldedValue);
+  
+  if (!iGen1 -> super.hasFinished) {
+    ucontext_t* genContext = iGen1 -> super.nextContext;
+    ucontext_t innerContext;
+    iGen1 -> super.nextContext = &innerContext;
+    swapcontext(&innerContext, genContext);
+    printf ("iGen1 %d %d\n",n,iGen1 -> yieldedValue);
+  }
 
-  use_gen (iGen,n-1);
+  // let yield another value
+
+  if (!iGen2 -> super.hasFinished) {
+    ucontext_t* genContext = iGen2 -> super.nextContext;
+    iGen2 -> super.nextContext = &innerContext;
+    swapcontext(&innerContext, genContext);
+    printf ("iGen2 %d %d\n",n,iGen2 -> yieldedValue);
+  }
+
+  use_gen (iGen1,iGen2,n-1);
 }
 
 
@@ -182,12 +190,28 @@ int main() {
   NB_BaseGeneratorHolder_t freeGenPool = {0,};
 
 
-  TestGenerator_t* generator = (TestGenerator_t*) getFreeGenerator (loop_gen,
+  TestGenerator_t* gen1 = (TestGenerator_t*) getFreeGenerator (loop_gen,
                                                                     sizeof(TestGenerator_t),
                                                                     &freeGenPool,
                                                                     &genPool);
 
+  TestGenerator_t* gen2 = (TestGenerator_t*) getFreeGenerator (loop_gen,
+                                                                    sizeof(TestGenerator_t),
+                                                                    &freeGenPool,
+                                                                    &genPool);
+  use_gen (gen1,gen2,20);
 
-  use_gen (generator,10);
+
+  TestGenerator_t* gen12 = (TestGenerator_t*) getFreeGenerator (loop_gen,
+                                                                    sizeof(TestGenerator_t),
+                                                                    &freeGenPool,
+                                                                    &genPool);
+
+  TestGenerator_t* gen22 = (TestGenerator_t*) getFreeGenerator (loop_gen,
+                                                                sizeof(TestGenerator_t),
+                                                                &freeGenPool,
+                                                                &genPool);
+
+  use_gen (gen12,gen22,20);
   return 0;
 }
