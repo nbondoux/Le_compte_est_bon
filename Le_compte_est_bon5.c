@@ -4,10 +4,18 @@
 #include <ucontext.h>
 #include <setjmp.h>
 
-
-
 // generics for generators
 #define NB_GENERATOR_STACK_LENGTH 1000
+
+#define NB_PREEMPT(gen) \
+    if (!sigsetjmp (gen -> super.nextOuterContext,0)) { \
+      siglongjmp (gen -> super.nextGenContext,0); \
+    }
+
+#define NB_YIELD(gen) \
+    if (!sigsetjmp (gen -> super.nextGenContext,0)) { \
+      siglongjmp (gen -> super.nextOuterContext,0); \
+    }
 
 // a generator
 struct NB_BaseGenerator;
@@ -76,13 +84,16 @@ NB_BaseGenerator_t* getFreeGenerator (void (*iContextCreator) (),
   }
 }
 
-void freePool (NB_BaseGeneratorHolder_t* ioFreeGeneratorPool, NB_BaseGeneratorHolder_t* ioGeneratorPool)
+void freePool (NB_BaseGeneratorHolder_t* ioFreeGeneratorPool, NB_BaseGeneratorHolder_t* ioGeneratorPool, void (*iCleanChildGenerator) (void*) )
 {
   // should lock by mutex here ?
   NB_BaseGenerator_t* generator = ioGeneratorPool -> headOfList;
 
   while (generator != NULL) {
     NB_BaseGenerator_t* nextGenerator = generator -> next;
+    if (iCleanChildGenerator) {
+      iCleanChildGenerator (generator);
+    }
     free (generator);
     generator = nextGenerator;
   }
@@ -110,9 +121,7 @@ void run_gen (TestGenerator_t* iGen, int i) {
 
   if (i!=10) {
     // go back to outer context
-    if (!sigsetjmp (iGen -> super.nextGenContext,0)) {
-      siglongjmp (iGen -> super.nextOuterContext,0);
-    }
+    NB_YIELD (iGen);
     run_gen (iGen, i+1);
   }
 }
@@ -127,9 +136,7 @@ void loop_gen () {
   TestGenerator_t*  generator = (TestGenerator_t*) NB_Generators_Tmp_Context_Holder;
 
   // go back to outer context
-  if (!sigsetjmp (generator -> super.nextGenContext,0)) {
-    siglongjmp (generator -> super.nextOuterContext,0);
-  }
+  NB_YIELD (generator);
 
   while (1) {
     generator -> super.hasFinished = 0;
@@ -144,9 +151,7 @@ void loop_gen () {
     // go back to outer context
     generator -> super.hasFinished = 1;
 
-    if (!sigsetjmp (generator -> super.nextGenContext,0)) {
-      siglongjmp (generator -> super.nextOuterContext,0);
-    }
+    NB_YIELD (generator);
    
   }
   
@@ -159,21 +164,15 @@ void use_gen (TestGenerator_t* iGen1, TestGenerator_t* iGen2, int n) {
   if (n == 0)
     return;
 
-  ucontext_t innerContext;
-  
   if (!iGen1 -> super.hasFinished) {
-    if (!sigsetjmp (iGen1 -> super.nextOuterContext,0)) {
-      siglongjmp (iGen1 -> super.nextGenContext,0);
-    }
+    NB_PREEMPT(iGen1);
     printf ("iGen1 %d %d\n",n,iGen1 -> yieldedValue);
   }
 
   // let yield another value
 
   if (!iGen2 -> super.hasFinished) {
-    if (!sigsetjmp (iGen2 -> super.nextOuterContext,0)) {
-      siglongjmp (iGen2 -> super.nextGenContext,0);
-    }
+    NB_PREEMPT(iGen2);
     printf ("iGen2 %d %d\n",n,iGen2 -> yieldedValue);
   }
 
