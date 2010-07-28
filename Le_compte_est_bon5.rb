@@ -248,13 +248,40 @@ module Le_Compte_Est_Bon
       "#{@value}"
     end
   end
- 
+
   class Algo
+    
+    class BestSolution
+      attr_reader :node   
+      attr_writer :node
+      
+      def initialize(iTarget)
+        @target = iTarget
+        @node = nil
+        @delta = nil
+      end
+
+      def isSolutionFound
+        @delta == 0
+      end
+
+      def tryBestSolution(iNode)
+        if not @delta or 
+            (iNode.value - @target < @delta and @target - iNode.value < @delta)
+          @delta = @target - iNode.value
+          @delta = - @delta if @delta < 0
+          @node=iNode.duplicateTree
+
+          puts "Best so far: #{@node.value} = #{@node}"
+        end
+      end
+    end
+
     attr_reader :target,:bestSolution
 
     def initialize (iTarget)
       @target = iTarget
-      @bestSolution = nil
+      @bestSolution = BestSolution.new(target)
     end
    
     def algo_l_size (iL, iLSize, &block)
@@ -272,7 +299,7 @@ module Le_Compte_Est_Bon
         # on top of the file
         
         Le_Compte_Est_Bon.getAllSubCombinationCouples(iL,iLSize) {|l1,l2|
-          break if @bestSolution
+          break if @bestSolution.isSolutionFound
           if not l1.empty
             l1_size = l1.size
             l2_size = l2.size
@@ -280,10 +307,10 @@ module Le_Compte_Est_Bon
             newNode = Node.new
 
             algo_l_size(l1, l1_size) {|elmt1|
-              break if @bestSolution
+              break if @bestSolution.isSolutionFound
 
               algo_l_size(l2, l2_size) {|elmt2|
-                break if @bestSolution
+                break if @bestSolution.isSolutionFound
 
                 newNode.leftNode = elmt1
                 newNode.rightNode = elmt2
@@ -362,7 +389,7 @@ module Le_Compte_Est_Bon
       #gets all combinations of size n verifying iMinLength <= n < iLSize
 
       Le_Compte_Est_Bon.getSubCombinations(iL,iLSize,1,iLSize) {|sl|
-        break if @bestSolution
+        break if @bestSolution.isSolutionFound
         sl_size = sl.size
         algo_l_size(sl, sl_size, &block)
       }
@@ -372,23 +399,15 @@ module Le_Compte_Est_Bon
     private :algo_l_size, :algo_all_sizes
     
     def run(iL)
-
-      compteur = 0
       l=Le_Compte_Est_Bon.arrayToSinglyLinked(iL.collect {|elmt| FinalNode.new(elmt)})
       algo_all_sizes(l,l.size()) {|elmt|
-        compteur = compteur + 1
-
-        if elmt.value == @target
-          @bestSolution=elmt.duplicateTree
-        end
-
+        @bestSolution.tryBestSolution(elmt)
       }
 
-      #to-do: cleaning; remove "compteur" variables
-      puts compteur
-      
-      if @bestSolution
-        puts "#{@target} = #{@bestSolution}"
+      if @bestSolution.isSolutionFound
+        puts "#{@target} = #{@bestSolution.node}"
+      elsif @bestSolution.node
+        puts "No Solution; nearest solution is: #{@bestSolution.node.value} = #{@bestSolution.node}"
       else
         puts "No Solution"
       end
