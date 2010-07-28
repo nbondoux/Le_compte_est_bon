@@ -245,7 +245,8 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
       // a + (b+c), (b+c) -a
       // a * (b*c), (b*c) /a
 
-      if (noeud_b -> type != Noeud || noeud_b -> u.Noeud.op != Plus) {
+      if (val_a > 0 && val_b > 0 &&
+          (noeud_b -> type != Noeud || noeud_b -> u.Noeud.op != Plus) ) {
         nouv_arbre.valeur=val_a + val_b;
         nouv_arbre.u.Noeud.op = Plus;
         {
@@ -263,7 +264,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
         }
       }
 
-      if (val_a > val_b) {
+      if (val_a >= val_b && val_b > 0) {
          if (noeud_a -> type != Noeud || noeud_a -> u.Noeud.op != Plus) {
            nouv_arbre.valeur=val_a - val_b;
            nouv_arbre.u.Noeud.op = Moins;
@@ -288,11 +289,13 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int prof, solution * best_
           {
             algo(l, taille_lMinusOne, prof, best_res, cible, &nouv_arbre, a);
           }
+          nouv_arbre.u.Noeud.ag = noeud_a;
+          nouv_arbre.u.Noeud.ad = noeud_b;
         }
       }
 
       if (noeud_a -> type != Noeud || noeud_a -> u.Noeud.op != Mult) {
-        if( val_a > val_b && val_b > 1 && (val_a % val_b) == 0) {
+        if( val_a >= val_b && val_b > 1 && (val_a % val_b) == 0) {
           nouv_arbre.valeur=val_a / val_b;
           nouv_arbre.u.Noeud.op = Divi;
           {

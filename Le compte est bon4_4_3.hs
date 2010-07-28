@@ -114,21 +114,24 @@ algo2_foreach_op iA iB iBase iTail iBest_res iCible iProf iException=
         sol1 <-(case iB of
                    Noeud _ _ _ Plus -> return iBest_res
                    _ -> (
-                         do
-                           sol <- next_algo (Noeud (val_a+val_b) iA iB Plus) iBest_res
-                           (
-                             if (val_b > val_a) then
-                               next_algo (Noeud (val_b-val_a) iB iA Moins) sol
-                             else
-                               return sol
-                             )
-                        )
+                     if val_a > 0 && val_b > 0 then
+                       do
+                         sol <- next_algo (Noeud (val_a+val_b) iA iB Plus) iBest_res
+                         (
+                           if (val_b > val_a) then
+                             next_algo (Noeud (val_b-val_a) iB iA Moins) sol
+                           else
+                             return sol
+                           )
+                     else
+                       return iBest_res
+                     )
                )
 
         sol2 <- (case iA of
                     Noeud _ _ _ Plus -> return sol1
                     _ -> (
-                          if (val_a > val_b) then
+                          if (val_a >= val_b && val_b > 0) then
                             next_algo (Noeud (val_a-val_b) iA iB Moins) sol1
                           else
                             return sol1
@@ -147,7 +150,7 @@ algo2_foreach_op iA iB iBase iTail iBest_res iCible iProf iException=
                                   )
         
                            (
-                             if (val_a > 1  &&  (val_b `mod` val_a) == 0) then
+                             if (val_b > val_a && val_a > 1  &&  (val_b `mod` val_a) == 0) then
                                next_algo (Noeud (div val_b val_a) iB iA Divi) sol
                              else
                                return sol
@@ -157,7 +160,7 @@ algo2_foreach_op iA iB iBase iTail iBest_res iCible iProf iException=
         (case iA of
             Noeud _ _ _ Mult -> return sol3
             _ -> (
-                  if (val_b > 1  &&  (val_a `mod` val_b) == 0) then
+                  if (val_a >= val_b && val_b > 1  &&  (val_a `mod` val_b) == 0) then
                     next_algo (Noeud (div val_a val_b) iA iB Divi) sol3
                   else
                     return sol3

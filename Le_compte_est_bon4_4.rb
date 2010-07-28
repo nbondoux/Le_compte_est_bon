@@ -149,7 +149,8 @@ module Le_Compte_Est_Bon
           # a+(b+c), (b+c)-a
           # a*(b*c), (b*c)/a
 
-          if node_b.class != Node or node_b.operation != :Add
+          if val_a > 0 and val_b > 0 and
+              (node_b.class != Node or node_b.operation != :Add)
             newNode.value=val_a + val_b
             newNode.operation = :Add
           
@@ -169,7 +170,7 @@ module Le_Compte_Est_Bon
             end
           end
           
-          if val_a > val_b
+          if val_a >= val_b and val_b > 0
             if node_a.class != Node or node_a.operation != :Add
               newNode.value=val_a - val_b
               newNode.operation = :Minus
@@ -199,7 +200,7 @@ module Le_Compte_Est_Bon
 
           
           if (node_a.class != Node or node_a.operation != :Mult)
-            if( val_a > val_b and val_b > 1 and (val_a % val_b) == 0)
+            if( val_a >= val_b and val_b > 1 and (val_a % val_b) == 0)
               newNode.value=val_a / val_b
               newNode.operation = :Divi
               
