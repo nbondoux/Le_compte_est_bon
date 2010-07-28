@@ -8,7 +8,6 @@
 
 # no duplicate value is therefore ever generated for l or any other sub-lists
 
-$compteur2=0
 module Le_Compte_Est_Bon
   
   class SinglyLinkedListAbstract
@@ -257,16 +256,7 @@ module Le_Compte_Est_Bon
       @target = iTarget
       @bestSolution = nil
     end
-
-    def checkNode(iNode)
-      $compteur2 = $compteur2 + 1
-
-      if iNode.value == @target
-        @bestSolution=iNode.duplicateTree
-      end
-    end
-    private :checkNode
-    
+   
     def algo_l_size (iL, iLSize, &block)
       if iL.next == SinglyLinkedList.emptyList
         # if l.size is one
@@ -303,7 +293,6 @@ module Le_Compte_Est_Bon
                 if val1 > 0 and val2 > 0
                   newNode.value=val1 + val2
                   newNode.operation = :Add
-                  checkNode(newNode)
                   yield newNode
                 end
                 
@@ -315,7 +304,6 @@ module Le_Compte_Est_Bon
                     newNode.rightNode = elmt1
                     newNode.operation = :Minus
                     
-                    checkNode(newNode)
                     yield newNode
                     newNode.leftNode = elmt1
                     newNode.rightNode = elmt2
@@ -326,7 +314,6 @@ module Le_Compte_Est_Bon
                   if elmt1.class != Node or elmt1.operation != :Add
                     newNode.value=val1 - val2
                     newNode.operation = :Minus
-                    checkNode(newNode)
                     yield newNode
                   end
                 end
@@ -335,7 +322,6 @@ module Le_Compte_Est_Bon
                   newNode.value=val1 * val2
                   newNode.operation = :Mult
                   
-                  checkNode(newNode)
                   yield newNode
                 end
                 
@@ -346,7 +332,6 @@ module Le_Compte_Est_Bon
                     newNode.rightNode = elmt1
                     newNode.operation = :Divi
                     
-                    checkNode(newNode)
                     yield newNode
                     newNode.leftNode = elmt1
                     newNode.rightNode = elmt2
@@ -359,7 +344,6 @@ module Le_Compte_Est_Bon
                     newNode.value=val1 / val2
                     newNode.operation = :Divi
                     
-                    checkNode(newNode)
                     yield newNode
                   end
                 end
@@ -388,15 +372,20 @@ module Le_Compte_Est_Bon
     private :algo_l_size, :algo_all_sizes
     
     def run(iL)
+
       compteur = 0
       l=Le_Compte_Est_Bon.arrayToSinglyLinked(iL.collect {|elmt| FinalNode.new(elmt)})
-      l.each {|i| checkNode(i)}
       algo_all_sizes(l,l.size()) {|elmt|
-        compteur = compteur+1 }
-      #puts "#{elmt}"}
+        compteur = compteur + 1
+
+        if elmt.value == @target
+          @bestSolution=elmt.duplicateTree
+        end
+
+      }
+
       #to-do: cleaning; remove "compteur" variables
       puts compteur
-      puts $compteur2
       
       if @bestSolution
         puts "#{@target} = #{@bestSolution}"
