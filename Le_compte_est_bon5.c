@@ -9,12 +9,12 @@
 
 #define NB_PREEMPT(gen) \
     if (!sigsetjmp (gen -> super.nextOuterContext,0)) { \
-      siglongjmp (gen -> super.nextGenContext,0); \
+      siglongjmp (gen -> super.nextGenContext,1); \
     }
 
 #define NB_YIELD(gen) \
     if (!sigsetjmp (gen -> super.nextGenContext,0)) { \
-      siglongjmp (gen -> super.nextOuterContext,0); \
+      siglongjmp (gen -> super.nextOuterContext,1); \
     }
 
 // a generator
@@ -108,7 +108,7 @@ void NB_freePool (NB_BaseGeneratorHolder_t* ioGeneratorPool, void (*iCleanChildG
 
 // end of generics for generators
 
-
+/*
 //test
 
 struct TestGenerator {
@@ -178,7 +178,6 @@ void use_gen (TestGenerator_t* iGen1, TestGenerator_t* iGen2, int n) {
   use_gen (iGen1,iGen2,n-1);
 }
 
-
 int main() {
   NB_BaseGeneratorHolder_t genPool = {0,};
 
@@ -202,6 +201,115 @@ int main() {
                                                                 &genPool);
   gen22->super.isAtEnd = 0;
   use_gen (gen12,gen22,20);
+
+  NB_freePool (&genPool,NULL);
+
+  return 0;
+}
+
+*/
+
+
+
+struct SubCombinationsFixedLSizeGenerator {
+  NB_BaseGenerator_t super;
+  
+  // input values;
+  void ** l;
+  size_t lSize;
+  
+  size_t subLSize;
+  // containes the output value
+  void ** yieldedSubL;
+   
+};
+
+typedef struct SubCombinationsFixedLSizeGenerator SubCombinationsFixedLSizeGenerator_t;
+
+void subcombinationsFixedLSizeGenerator_rec (SubCombinationsFixedLSizeGenerator_t* iGen,
+                                             void ** iL,
+                                             size_t l_size,
+                                             void ** subL,
+                                             size_t subLSize) {
+  if (subLSize == 0) {
+    NB_YIELD(iGen);
+  } else {
+    //all combinations that contain head of list
+    *subL = *iL;
+    subcombinationsFixedLSizeGenerator_rec (iGen, iL+1,l_size - 1, subL+1, subLSize - 1);
+    //all combinations that do not contain head of list
+    if (l_size > subLSize) {
+      subcombinationsFixedLSizeGenerator_rec (iGen, iL+1,l_size - 1, subL, subLSize);
+    }
+  }
+}
+
+void subcombinationsFixedLSizeGenerator_gen() {
+
+  // go back to outer context
+  SubCombinationsFixedLSizeGenerator_t* generator = (SubCombinationsFixedLSizeGenerator_t*) NB_Generators_Tmp_Context_Holder;
+
+  while (1) {
+    while (generator -> super.isAtEnd) {
+      NB_YIELD (generator);
+    }
+    subcombinationsFixedLSizeGenerator_rec (generator,
+                                            generator -> l,
+                                            generator -> lSize,
+                                            generator -> yieldedSubL,
+                                            generator -> subLSize
+                                            );
+    generator -> super.isAtEnd = 1;
+  }
+}
+
+
+
+
+int main() {
+  
+  int nbs [50];
+  int i =0;
+
+  for (i=0; i< 50;++i) {
+    nbs[i] = i;
+  }
+  
+  void * l[27];
+  for (i=0; i< 27;++i) {
+    l[i] = (void *) (nbs+i);
+  }
+
+  void * subL[26];
+
+  
+  NB_BaseGeneratorHolder_t genPool = {0,};
+
+  
+  SubCombinationsFixedLSizeGenerator_t* gen1 =
+    (SubCombinationsFixedLSizeGenerator_t*) NB_getFreeGenerator (subcombinationsFixedLSizeGenerator_gen,
+                                                                 sizeof(SubCombinationsFixedLSizeGenerator_t),
+                                                                 &genPool);
+  
+  gen1 -> l = l;
+  gen1 -> lSize = 27;
+  gen1 -> yieldedSubL = subL;
+  
+  for (i=0;i<=26;++i) {
+    gen1 -> subLSize = i;
+    gen1 -> super.isAtEnd = 0;
+    NB_PREEMPT (gen1);
+    while (!(gen1 -> super.isAtEnd)) {
+      int j;
+      for (j = 0;j < i;j++) {
+        //printf ("%d ",* (int *) (subL[j]));
+      }
+      //printf ("\n");
+
+      NB_PREEMPT (gen1);
+    }
+  }
+
 
   NB_freePool (&genPool,NULL);
 
