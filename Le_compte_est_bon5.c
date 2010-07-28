@@ -27,17 +27,20 @@ struct NB_BaseGeneratorHolder;
 static struct NB_BaseGenerator* NB_Generators_Tmp_Context_Holder;
 
 struct NB_BaseGeneratorHolder {
-  struct NB_BaseGenerator * headOfList;
-  // should also hold a mutex for update
+  // should also hold mutexes for updates
+  struct NB_BaseGenerator * poolHeadOfList;
+  struct NB_BaseGenerator * freePoolHeadOfList;
 };
   
 
 struct NB_BaseGenerator {
   struct NB_BaseGenerator* nextFree;
   struct NB_BaseGenerator* next;
-  struct NB_BaseGeneratorHolder* freePool;
+  struct NB_BaseGeneratorHolder* pool;
 
-  int hasFinished;
+  // it is up to the user of the generator to put "isAtEnd" to 0
+  // after generator initialization
+  int isAtEnd;
 
   sigjmp_buf nextGenContext;
   sigjmp_buf nextOuterContext;
@@ -50,18 +53,22 @@ typedef struct NB_BaseGenerator NB_BaseGenerator_t;
 typedef struct NB_BaseGeneratorHolder NB_BaseGeneratorHolder_t;
 
 
-NB_BaseGenerator_t* getFreeGenerator (void (*iContextCreator) (),
+NB_BaseGenerator_t* NB_getFreeGenerator (void (*iContextCreator) (),
                                       size_t iGeneratorSize,
-                                      NB_BaseGeneratorHolder_t* ioFreeGeneratorPool,
                                       NB_BaseGeneratorHolder_t* ioGeneratorPool) {
-  if (ioFreeGeneratorPool -> headOfList != NULL) {
-    NB_BaseGenerator_t* generator = ioFreeGeneratorPool -> headOfList;
-    ioFreeGeneratorPool -> headOfList = generator -> nextFree;
+  if (ioGeneratorPool -> freePoolHeadOfList != NULL) {
+    NB_BaseGenerator_t* generator = ioGeneratorPool -> freePoolHeadOfList;
+    ioGeneratorPool -> freePoolHeadOfList = generator -> nextFree;
     generator -> nextFree = NULL;
-    generator -> hasFinished = 0;
+    generator -> isAtEnd = 1;
     return generator;
   } else {
     NB_BaseGenerator_t* generator = (NB_BaseGenerator_t*) calloc (1,iGeneratorSize);
+    // should lock by mutex here
+    generator -> next = ioGeneratorPool -> poolHeadOfList;
+    ioGeneratorPool -> poolHeadOfList = generator;
+    generator -> isAtEnd = 1;
+
     // allocate the stack:
     getcontext (&generator -> ucp);
     generator -> ucp.uc_stack.ss_sp = generator -> stack;
@@ -74,20 +81,16 @@ NB_BaseGenerator_t* getFreeGenerator (void (*iContextCreator) (),
       // let's initialize the generator
       setcontext (&generator -> ucp);
     }    
-    generator -> freePool = ioFreeGeneratorPool;
-
-    // should lock by mutex here
-    generator -> next = ioGeneratorPool -> headOfList;
-    ioGeneratorPool -> headOfList = generator;
+    generator -> pool = ioGeneratorPool;
 
     return generator;
   }
 }
 
-void freePool (NB_BaseGeneratorHolder_t* ioFreeGeneratorPool, NB_BaseGeneratorHolder_t* ioGeneratorPool, void (*iCleanChildGenerator) (void*) )
+void NB_freePool (NB_BaseGeneratorHolder_t* ioGeneratorPool, void (*iCleanChildGenerator) (void*) )
 {
   // should lock by mutex here ?
-  NB_BaseGenerator_t* generator = ioGeneratorPool -> headOfList;
+  NB_BaseGenerator_t* generator = ioGeneratorPool -> poolHeadOfList;
 
   while (generator != NULL) {
     NB_BaseGenerator_t* nextGenerator = generator -> next;
@@ -99,8 +102,8 @@ void freePool (NB_BaseGeneratorHolder_t* ioFreeGeneratorPool, NB_BaseGeneratorHo
   }
 
   // should lock by mutex here
-  ioFreeGeneratorPool ->headOfList = NULL;
-  ioGeneratorPool -> headOfList = NULL;
+  ioGeneratorPool -> poolHeadOfList = NULL;
+  ioGeneratorPool -> freePoolHeadOfList = NULL;
 }
 
 // end of generics for generators
@@ -118,10 +121,11 @@ typedef struct TestGenerator TestGenerator_t;
 void run_gen (TestGenerator_t* iGen, int i) {
   // yield i;
   iGen -> yieldedValue = i;
+  
+  // go back to outer context
+  NB_YIELD (iGen);
 
   if (i!=10) {
-    // go back to outer context
-    NB_YIELD (iGen);
     run_gen (iGen, i+1);
   }
 }
@@ -135,27 +139,22 @@ void loop_gen () {
   // go back to outer context
   TestGenerator_t*  generator = (TestGenerator_t*) NB_Generators_Tmp_Context_Holder;
 
-  // go back to outer context
-  NB_YIELD (generator);
-
   while (1) {
-    generator -> super.hasFinished = 0;
+    while (generator -> super.isAtEnd) {
+      NB_YIELD (generator);      
+    }
+
     // run of the generator
     run_gen (generator,0);
 
     // let's put this generator in free list !
     // should lock by mutex here
-    generator -> super.nextFree = generator -> super.freePool -> headOfList;
-    generator -> super.freePool -> headOfList = &generator->super;
+    generator -> super.nextFree = generator -> super.pool -> freePoolHeadOfList;
+    generator -> super.pool -> freePoolHeadOfList = &generator->super;
       
     // go back to outer context
-    generator -> super.hasFinished = 1;
-
-    NB_YIELD (generator);
-   
+    generator -> super.isAtEnd = 1;  
   }
-  
-
 }
 
 
@@ -164,15 +163,15 @@ void use_gen (TestGenerator_t* iGen1, TestGenerator_t* iGen2, int n) {
   if (n == 0)
     return;
 
-  if (!iGen1 -> super.hasFinished) {
-    NB_PREEMPT(iGen1);
+  NB_PREEMPT(iGen1);
+  if (!iGen1 -> super.isAtEnd) {
     printf ("iGen1 %d %d\n",n,iGen1 -> yieldedValue);
   }
 
   // let yield another value
 
-  if (!iGen2 -> super.hasFinished) {
-    NB_PREEMPT(iGen2);
+  NB_PREEMPT(iGen2);
+  if (!iGen2 -> super.isAtEnd) {
     printf ("iGen2 %d %d\n",n,iGen2 -> yieldedValue);
   }
 
@@ -182,31 +181,29 @@ void use_gen (TestGenerator_t* iGen1, TestGenerator_t* iGen2, int n) {
 
 int main() {
   NB_BaseGeneratorHolder_t genPool = {0,};
-  NB_BaseGeneratorHolder_t freeGenPool = {0,};
 
 
-  TestGenerator_t* gen1 = (TestGenerator_t*) getFreeGenerator (loop_gen,
+  TestGenerator_t* gen1 = (TestGenerator_t*) NB_getFreeGenerator (loop_gen,
                                                                     sizeof(TestGenerator_t),
-                                                                    &freeGenPool,
                                                                     &genPool);
-
-  TestGenerator_t* gen2 = (TestGenerator_t*) getFreeGenerator (loop_gen,
+  gen1->super.isAtEnd = 0;
+  TestGenerator_t* gen2 = (TestGenerator_t*) NB_getFreeGenerator (loop_gen,
                                                                     sizeof(TestGenerator_t),
-                                                                    &freeGenPool,
                                                                     &genPool);
   use_gen (gen1,gen2,20);
 
 
-  TestGenerator_t* gen12 = (TestGenerator_t*) getFreeGenerator (loop_gen,
+  TestGenerator_t* gen12 = (TestGenerator_t*) NB_getFreeGenerator (loop_gen,
                                                                     sizeof(TestGenerator_t),
-                                                                    &freeGenPool,
-                                                                    &genPool);
-
-  TestGenerator_t* gen22 = (TestGenerator_t*) getFreeGenerator (loop_gen,
+                                                                   &genPool);
+  gen12->super.isAtEnd = 0;
+  TestGenerator_t* gen22 = (TestGenerator_t*) NB_getFreeGenerator (loop_gen,
                                                                 sizeof(TestGenerator_t),
-                                                                &freeGenPool,
                                                                 &genPool);
-
+  gen22->super.isAtEnd = 0;
   use_gen (gen12,gen22,20);
+
+  NB_freePool (&genPool,NULL);
+
   return 0;
 }
