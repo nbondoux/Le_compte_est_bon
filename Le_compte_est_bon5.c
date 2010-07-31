@@ -612,7 +612,10 @@ void lcebFixedSizeGenerator_run(NB_BaseGenerator_t* ioGen) {
 
     NB_PREEMPT (coupleGenerator);
     while (!coupleGenerator -> super.isAtEnd) {
-
+      if(coupleGenerator -> yieldedSubL1Size == 0) {
+        NB_PREEMPT (coupleGenerator);
+        continue;
+      }
       LcebFixedSizeGenerator_t* elmt1Generator =
       (LcebFixedSizeGenerator_t*) NB_getFreeGenerator (&LcebFixedSizeGeneratorHolder);
       elmt1Generator -> l = (Node_t **) (coupleGenerator -> yieldedSubL1);
@@ -620,8 +623,7 @@ void lcebFixedSizeGenerator_run(NB_BaseGenerator_t* ioGen) {
       elmt1Generator -> super.isAtEnd = 0;
 
       NB_PREEMPT (elmt1Generator);
-      while (elmt1Generator -> super.isAtEnd) {
-
+      while (!elmt1Generator -> super.isAtEnd) {
         Node_t* elmt1 = elmt1Generator -> yieldedNode;
         unsigned int val1 = valueNode (elmt1);
         newNode.u.Node.ag = elmt1;
@@ -633,7 +635,7 @@ void lcebFixedSizeGenerator_run(NB_BaseGenerator_t* ioGen) {
         elmt2Generator -> super.isAtEnd = 0;
 
         NB_PREEMPT (elmt2Generator);
-        while (elmt2Generator -> super.isAtEnd) {
+        while (!elmt2Generator -> super.isAtEnd) {
           Node_t* elmt2 = elmt2Generator -> yieldedNode;
           unsigned int val2 = valueNode (elmt2);
           newNode.u.Node.ad = elmt2;
