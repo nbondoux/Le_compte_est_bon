@@ -437,7 +437,7 @@ void freeNode(Node_t * ioNode) {
   free(ioNode);
 }
 
-/*retourne la priorité de l'arbre */
+// return the priority of top operation of the node
 unsigned int opPriority(Node_t * iNode) {
   if(iNode-> type == Node) {
     if(iNode -> u.Node.op == Add || iNode -> u.Node.op == Minus)
@@ -463,7 +463,7 @@ int opAssociativity(Node_t * iNode) {
 }
 
 
-/*alloue (malloc) une chaine de caractères contenant l'expression contenue par l'arbre */
+// allocate with malloc a string that represents the expression of the Node
 char * stringFromNode (Node_t * iNode) {
   char * c1, *c2, *c;
   unsigned int i1,i2;
@@ -510,7 +510,8 @@ char * stringFromNode (Node_t * iNode) {
   return c;
 }
 
-// malloc une table de Nodes, à partir du tableau d'entiers l, de longueur n
+// allocate (with malloc) a table of Nodes from a table of int
+// of size iLSize
 Node_t ** buildNodeVector(unsigned int * iL, size_t iLSize) {
   unsigned int i;
   Node_t ** a;
