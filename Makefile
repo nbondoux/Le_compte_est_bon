@@ -36,7 +36,7 @@ Le\ compte\ est\ bon4_4_c_rapide_2:Le\ compte\ est\ bon4_4_rapide_2.c
 Le_compte_est_bon4_5:Le_compte_est_bon4_5.c
 	gcc -std=c99 -O3 -march=native -Wall -o Le_compte_est_bon4_5 Le_compte_est_bon4_5.c
 Le_compte_est_bon5:Le_compte_est_bon5.c
-	gcc -O3 -march=native -Wall -o Le_compte_est_bon5 Le_compte_est_bon5.c
+	gcc -std=gnu99 -O3 -march=native -Wall -o Le_compte_est_bon5 Le_compte_est_bon5.c
 
 
 Le\ compte\ est\ bon4_4_gmp:Le\ compte\ est\ bon4_4_gmp.ml
