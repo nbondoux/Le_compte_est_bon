@@ -886,16 +886,19 @@ void le_compte_est_bon(unsigned int* iL, size_t iLSize, unsigned int iTarget) {
     NB_PREEMPT (elmtGenerator);
   }        
 
-  if (bestSolution.node != NULL && bestSolution.delta == 0) {
-    char * c;
-    c=stringFromNode(bestSolution.node);
-    printf("%d = %s\n",iTarget,c);
-    free(c);
-  } else if (bestSolution.node != NULL) {
-    char * c;
-    c=stringFromNode(bestSolution.node);
-    printf("No Solution found: nearest solution is: %d = %s\n", valueNode (bestSolution.node),c);
-    free(c);
+  if (bestSolution.node != NULL) {
+    if (bestSolution.delta == 0) {
+      char * c;
+      c=stringFromNode(bestSolution.node);
+      printf("%d = %s\n",iTarget,c);
+      free(c);
+    } else {
+      char * c;
+      c=stringFromNode(bestSolution.node);
+      printf("No Solution found: nearest solution is: %d = %s\n", valueNode (bestSolution.node),c);
+      free(c);
+    }
+    freeNode (bestSolution.node);
   } else {
     printf("No Solution found\n");
   }
