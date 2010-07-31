@@ -491,7 +491,7 @@ char * stringFromNode (Node_t * iNode) {
     else if(iNode->u.Node.op == Divi)
       strcat(c,"/");
     
-    if((!opAssociativity (iNode->u.Node.ad) && opPriority (iNode->u.Node.ad) <= opPriority (iNode))
+    if((!opAssociativity (iNode) && opPriority (iNode->u.Node.ad) <= opPriority (iNode))
        || opPriority (iNode->u.Node.ad) < opPriority (iNode)
        ) {
       strcat(c,"(");

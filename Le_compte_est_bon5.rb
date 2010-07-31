@@ -205,8 +205,18 @@ module Le_Compte_Est_Bon
      end
     end
 
+    def isOperationAssociative
+     if operation == :Add or operation == :Mult
+        return true
+      elsif operation == :Minus or operation == :Divi
+       return false
+     else
+       return 0
+     end
+    end
+
+
     def to_s
-      #trivial method for display; should be made better
       strLeft = @leftNode.to_s
       strRight = @rightNode.to_s
       
@@ -214,7 +224,8 @@ module Le_Compte_Est_Bon
         strLeft = "(#{strLeft})"
       end
 
-      if @rightNode.operationPriority <= operationPriority
+      if ((not isOperationAssociative) and @rightNode.operationPriority <= operationPriority) or
+          @rightNode.operationPriority < operationPriority
         strRight = "(#{strRight})"
       end
 
@@ -237,7 +248,11 @@ module Le_Compte_Est_Bon
     end
 
     def operationPriority
-       return 100
+      return 100
+    end
+    
+    def isOperationAssociative
+      false
     end
     
     def duplicateTree
