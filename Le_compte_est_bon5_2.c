@@ -2,153 +2,12 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <ucontext.h>
-#include <setjmp.h>
-
 
 // a simple functor
 struct NB_BaseFunctor {
   void (*run) (struct NB_BaseFunctor*, void *);   
 };
 typedef struct NB_BaseFunctor NB_BaseFunctor_t;
-
-// generics for generators
-#define NB_GENERATOR_STACK_LENGTH 1000
-
-#define NB_PREEMPT(gen) \
-  if (!sigsetjmp (((struct NB_BaseGenerator*) gen) -> nextOuterContext,0)) { \
-      siglongjmp (((struct NB_BaseGenerator*) gen) -> nextGenContext,1); \
-    }
-
-#define NB_YIELD(gen) \
-    if (!sigsetjmp (((struct NB_BaseGenerator*) gen) -> nextGenContext,0)) { \
-      siglongjmp (((struct NB_BaseGenerator*) gen) -> nextOuterContext,1); \
-    }
-
-// a generator
-struct NB_BaseGenerator;
-
-// a Holder wich maintains a list of the generators of a same kind (it  links the head of a linked list)
-struct NB_BaseGeneratorHolder;
-
-// technical value needed by makecontext; should be protected with a mutex ..
-static struct NB_BaseGenerator* NB_Generators_Tmp_Context_Holder;
-
-struct NB_BaseGeneratorHolder {
-  // should also hold mutexes for updates
-  struct NB_BaseGenerator * poolHeadOfList;
-  struct NB_BaseGenerator * freePoolHeadOfList;
-  
-  size_t generatorSize;
-
-  NB_BaseFunctor_t* elmtConstructor;
-  NB_BaseFunctor_t* elmtDestructor;
-};
-  
-
-struct NB_BaseGenerator {
-  struct NB_BaseGenerator* nextFree;
-  struct NB_BaseGenerator* next;
-  struct NB_BaseGeneratorHolder* pool;
-
-  // the function that does the generation
-  void (*run) (struct NB_BaseGenerator*); 
-
-  // it is up to the user of the generator to put "isAtEnd" to 0
-  // after generator initialization
-  int isAtEnd;
-
-  sigjmp_buf nextGenContext;
-  sigjmp_buf nextOuterContext;
-
-  ucontext_t ucp;
-  void* stack[NB_GENERATOR_STACK_LENGTH];
-};
-
-typedef struct NB_BaseGenerator NB_BaseGenerator_t;
-typedef struct NB_BaseGeneratorHolder NB_BaseGeneratorHolder_t;
-
-inline void NB_stopGenerator (NB_BaseGenerator_t* iGen) {
-    // should lock a mutex here
-    iGen -> nextFree = iGen -> pool -> freePoolHeadOfList;
-    iGen -> pool -> freePoolHeadOfList = iGen;
-
-    iGen -> isAtEnd = 1;
-}
-
-void NB_BaseGenerator_mainLoop() {
-
-  NB_BaseGenerator_t* generator = (NB_BaseGenerator_t*) NB_Generators_Tmp_Context_Holder;
-
-  while (1) {
-    while (generator -> isAtEnd) {
-      NB_YIELD (generator);
-    }
-
-    generator -> run (generator);
-
-    NB_stopGenerator (generator);
-  }
-}
-
-
-NB_BaseGenerator_t* NB_getFreeGenerator (NB_BaseGeneratorHolder_t* ioGeneratorPool) {
-  if (ioGeneratorPool -> freePoolHeadOfList != NULL) {
-    NB_BaseGenerator_t* generator = ioGeneratorPool -> freePoolHeadOfList;
-    ioGeneratorPool -> freePoolHeadOfList = generator -> nextFree;
-    generator -> nextFree = NULL;
-    generator -> isAtEnd = 1;
-    return generator;
-  } else {
-    NB_BaseGenerator_t* generator = (NB_BaseGenerator_t*) calloc (1,ioGeneratorPool -> generatorSize);
- 
-   // should lock by mutex here
-    generator -> next = ioGeneratorPool -> poolHeadOfList;
-    ioGeneratorPool -> poolHeadOfList = generator;
-    generator -> isAtEnd = 1;
-
-    ioGeneratorPool -> elmtConstructor -> run (ioGeneratorPool->elmtConstructor,generator);
-
-    // allocate the stack:
-    getcontext (&generator -> ucp);
-    generator -> ucp.uc_stack.ss_sp = generator -> stack;
-    generator -> ucp.uc_stack.ss_size= sizeof (generator -> stack);
-    generator -> ucp.uc_link = NULL;
-    makecontext (&generator -> ucp,&NB_BaseGenerator_mainLoop,0);
-
-    if (!sigsetjmp(generator -> nextOuterContext,0)) {
-      NB_Generators_Tmp_Context_Holder = generator;
-      // let's initialize the generator
-      setcontext (&generator -> ucp);
-    }    
-    generator -> pool = ioGeneratorPool;
-
-    return generator;
-  }
-}
-
-
-void NB_freePool (NB_BaseGeneratorHolder_t* ioGeneratorPool)
-{
-  // should lock by mutex here ?
-  NB_BaseGenerator_t* generator = ioGeneratorPool -> poolHeadOfList;
-
-  while (generator != NULL) {
-    NB_BaseGenerator_t* nextGenerator = generator -> next;
-
-    if (ioGeneratorPool -> elmtDestructor) {
-      ioGeneratorPool -> elmtDestructor -> run (ioGeneratorPool->elmtDestructor,generator);
-    }
-    free (generator);
-    generator = nextGenerator;
-  }
-
-  // should lock by mutex here
-  ioGeneratorPool -> poolHeadOfList = NULL;
-  ioGeneratorPool -> freePoolHeadOfList = NULL;
-}
-
-// end of generics for generators
 
 
 
@@ -260,8 +119,8 @@ void NB_freeSLCoroutineCtxPool (NB_BaseSLCoroutineCtxHolder_t* ioSLCoroCtxPool)
 // simple sub-lists generator
 // ////////////////////////////////////////////////////////////////////////////
 
-NB_BaseSLCoroutineCtxHolder_t SubCombinationsGeneratorRecCtxHolder = {0,};
-NB_BaseSLCoroutineCtxHolder_t SubCombinationsGeneratorCtxHolder = {0,};
+static NB_BaseSLCoroutineCtxHolder_t SubCombinationsGeneratorRecCtxHolder = {0,};
+static NB_BaseSLCoroutineCtxHolder_t SubCombinationsGeneratorCtxHolder = {0,};
 
 
 struct SubCombinationsGeneratorRecCtx {
@@ -269,14 +128,14 @@ struct SubCombinationsGeneratorRecCtx {
   
   // input values;
   void ** l;
-  size_t lSize; 
+  size_t lSize;
+  // size of the sublists to be generated
   size_t subLSize;
 
   // local values
   struct SubCombinationsGeneratorRecCtx* subListGen;
 
   // output values
-  size_t yieldedSubLSize;
 
   // contains in input the adress of the list to be filled
   void ** yieldedSubL;
@@ -377,27 +236,27 @@ short subCombinationsGenerator(SubCombinationsGeneratorCtx_t* ioCoroCtx) {
 
 
 // initializer:
-struct SubCombinationsGeneratorInitializer {
+struct SubCombinationsGeneratorCtxInitializer {
   NB_BaseFunctor_t super;
   size_t subLMaxStaticSize;
 };
-typedef struct SubCombinationsGeneratorInitializer SubCombinationsGeneratorInitializer_t;
+typedef struct SubCombinationsGeneratorCtxInitializer SubCombinationsGeneratorCtxInitializer_t;
 
-void subCombinationsGeneratorInitializer (NB_BaseFunctor_t* iSelf, void* ioCoroCtx) {
-  SubCombinationsGeneratorInitializer_t* self = (SubCombinationsGeneratorInitializer_t*) iSelf;
+void subCombinationsGeneratorCtxInitializer (NB_BaseFunctor_t* iSelf, void* ioCoroCtx) {
+  SubCombinationsGeneratorCtxInitializer_t* self = (SubCombinationsGeneratorCtxInitializer_t*) iSelf;
   SubCombinationsGeneratorCtx_t* ctx = (SubCombinationsGeneratorCtx_t*) ioCoroCtx;
   
   ctx -> yieldedSubL = (void **) malloc (sizeof (void*) * self -> subLMaxStaticSize);
 }
 
 //cleaner:
-struct SubCombinationsGeneratorCleaner {
+struct SubCombinationsGeneratorCtxCleaner {
   NB_BaseFunctor_t super;
 };
-typedef struct SubCombinationsGeneratorCleaner SubCombinationsGeneratorCleaner_t;
+typedef struct SubCombinationsGeneratorCtxCleaner SubCombinationsGeneratorCtxCleaner_t;
 
 
-void subCombinationsGeneratorCleaner (NB_BaseFunctor_t* iSelf, void* ioCoroCtx) {
+void subCombinationsGeneratorCtxCleaner (NB_BaseFunctor_t* iSelf, void* ioCoroCtx) {
   SubCombinationsGeneratorCtx_t* ctx = (SubCombinationsGeneratorCtx_t*) ioCoroCtx;
   if (ctx -> yieldedSubL != NULL) {
     free (ctx -> yieldedSubL);
@@ -409,127 +268,224 @@ void subCombinationsGeneratorCleaner (NB_BaseFunctor_t* iSelf, void* ioCoroCtx) 
 // Non-ordered couple of sub-lists generator
 // ////////////////////////////////////////////////////////////////////////////
 
-struct SubCombinationCouplesGenerator {
-  NB_BaseGenerator_t super;
+
+static NB_BaseSLCoroutineCtxHolder_t SubCombinationCouplesGeneratorRecCtxHolder = {0,};
+static NB_BaseSLCoroutineCtxHolder_t SubCombinationCouplesGeneratorRec2CtxHolder = {0,};
+static NB_BaseSLCoroutineCtxHolder_t SubCombinationCouplesGeneratorCtxHolder = {0,};
+
+
+struct SubCombinationCouplesGeneratorRecCtx {
+  NB_BaseSLCoroutineCtx_t super;
   
   // input values;
   void ** l;
   size_t lSize;
 
-  // containes the output value
-  size_t yieldedSubL1Size;
-  size_t yieldedSubL2Size;
+  // size of the first sub-lists in the couple to be generated
+  size_t subL1Size;
 
+  // local values
+  struct SubCombinationCouplesGeneratorRecCtx* subListGen;
 
-  // these two lists be malloced by user of the generator, and will be destroyed at deletion of
-  // the generator
+  // output values
+
+  // contains in input the adress of the list to be filled
   void ** yieldedSubL1;
   void ** yieldedSubL2;
    
 };
 
-typedef struct SubCombinationCouplesGenerator SubCombinationCouplesGenerator_t;
+typedef struct SubCombinationCouplesGeneratorRecCtx SubCombinationCouplesGeneratorRecCtx_t;
 
-// returns all subCombinations l1, l2
-// subL1RemSize contains the number of elements that remains to be added by the algo to subL1
 
-void subCombinationCouplesFixedLSizeGenerator_rec (SubCombinationCouplesGenerator_t* ioGen,
-                                             void ** iL,
-                                             size_t iSizeL,
-                                             void ** ioSubL1,
-                                             size_t iSubL1RemSize,
-                                             void ** ioSubL2) {
-  if (iSubL1RemSize == 0) {
+short subCombinationCouplesFixedLSizeGenerator_rec (SubCombinationCouplesGeneratorRecCtx_t* ioCoroCtx) {
+  crBegin;
+  if (ioCoroCtx -> subL1Size == 0) {
     size_t i;
-    for (i=0;i < iSizeL;++i) {
-      ioSubL2[i] = iL[i];
+    for (i=0;i < ioCoroCtx -> lSize;++i) {
+      (ioCoroCtx -> yieldedSubL2)[i] = (ioCoroCtx -> l)[i];
     }
-    NB_YIELD(ioGen);
+    crReturn(1);
   } else {
-    //all combinations where L1 contains head of list
-    *ioSubL1 = *iL;
-    subCombinationCouplesFixedLSizeGenerator_rec (ioGen, iL+1,iSizeL - 1, ioSubL1+1, iSubL1RemSize - 1, ioSubL2);
+    ioCoroCtx -> subListGen = (SubCombinationCouplesGeneratorRecCtx_t*) NB_getSLCoroutine(&SubCombinationCouplesGeneratorRecCtxHolder);
 
-    //all combinations where L1 does not contain head of list
-    if (iSizeL > iSubL1RemSize) {
-      *ioSubL2 = *iL;
-      subCombinationCouplesFixedLSizeGenerator_rec (ioGen, iL+1,iSizeL - 1, ioSubL1, iSubL1RemSize, ioSubL2+1);
+    //all combinations where l1 contains head of list
+    *(ioCoroCtx -> yieldedSubL1) = *(ioCoroCtx -> l);
+
+    ioCoroCtx -> subListGen -> l = ioCoroCtx -> l + 1;
+    ioCoroCtx -> subListGen -> lSize = ioCoroCtx -> lSize - 1;
+    ioCoroCtx -> subListGen -> yieldedSubL1 = ioCoroCtx -> yieldedSubL1 + 1;
+    ioCoroCtx -> subListGen -> subL1Size = ioCoroCtx -> subL1Size - 1;
+    ioCoroCtx -> subListGen -> yieldedSubL2 = ioCoroCtx -> yieldedSubL2;
+
+    while (subCombinationCouplesFixedLSizeGenerator_rec(ioCoroCtx ->  subListGen)) {
+      crReturn(1);
     }
-  }
-}
+    NB_freeSLCoroutineCtx ((NB_BaseSLCoroutineCtx_t*) (ioCoroCtx -> subListGen));
+    //all combinations where l2 contains head of list
+    if (ioCoroCtx -> lSize > ioCoroCtx -> subL1Size) {
+      ioCoroCtx -> subListGen = (SubCombinationCouplesGeneratorRecCtx_t*) NB_getSLCoroutine(&SubCombinationCouplesGeneratorRecCtxHolder);
 
+      *(ioCoroCtx -> yieldedSubL2) = *(ioCoroCtx -> l);
+
+      ioCoroCtx -> subListGen -> l = ioCoroCtx -> l+1;
+      ioCoroCtx -> subListGen -> lSize = ioCoroCtx -> lSize-1;
+      ioCoroCtx -> subListGen -> yieldedSubL1 = ioCoroCtx -> yieldedSubL1;
+      ioCoroCtx -> subListGen -> subL1Size = ioCoroCtx -> subL1Size;
+      ioCoroCtx -> subListGen -> yieldedSubL2 = ioCoroCtx -> yieldedSubL2+1;
+
+      while (subCombinationCouplesFixedLSizeGenerator_rec (ioCoroCtx ->  subListGen)) {
+        crReturn(1);
+      }
+      NB_freeSLCoroutineCtx ((NB_BaseSLCoroutineCtx_t*) (ioCoroCtx -> subListGen));
+    }
+
+  }
+
+  crFinish;
+  return 0;
+}
 
 // same as rec1, but for
 // for instance, for [a,b,c,d,e,f], and iSubL1RemSize == 3, does not return both [[a,b,c],[d,e,f]] and  [[d,e,f],[a,b,c]]
-void subCombinationCouplesFixedLSizeGenerator_rec2 (SubCombinationCouplesGenerator_t* ioGen,
-                                             void ** iL,
-                                             size_t iSizeL,
-                                             void ** ioSubL1,
-                                             size_t iSubL1RemSize,
-                                             void ** ioSubL2) {
-  if (iSubL1RemSize*2 != iSizeL || iSizeL == 0) {
-    subCombinationCouplesFixedLSizeGenerator_rec (ioGen, iL,iSizeL, ioSubL1, iSubL1RemSize, ioSubL2);
+
+struct SubCombinationCouplesGeneratorRec2Ctx {
+  NB_BaseSLCoroutineCtx_t super;
+  
+  // input values;
+  void ** l;
+  size_t lSize;
+
+  // size of the first sub-lists in the couple to be generated
+  size_t subL1Size;
+
+  // local values
+  struct SubCombinationCouplesGeneratorRecCtx* subListGen;
+
+  // output values
+
+  // contains in input the adress of the list to be filled
+  void ** yieldedSubL1;
+  void ** yieldedSubL2;
+   
+};
+
+typedef struct SubCombinationCouplesGeneratorRec2Ctx SubCombinationCouplesGeneratorRec2Ctx_t;
+
+short subCombinationCouplesFixedLSizeGenerator_rec2 (SubCombinationCouplesGeneratorRec2Ctx_t* ioCoroCtx) {
+  crBegin;
+  ioCoroCtx -> subListGen = (SubCombinationCouplesGeneratorRecCtx_t*) NB_getSLCoroutine(&SubCombinationCouplesGeneratorRecCtxHolder);
+
+  
+  if (ioCoroCtx -> subL1Size *2 != ioCoroCtx -> lSize || ioCoroCtx -> lSize == 0) {
+    ioCoroCtx -> subListGen -> l = ioCoroCtx -> l;
+    ioCoroCtx -> subListGen -> lSize = ioCoroCtx -> lSize;
+    ioCoroCtx -> subListGen -> yieldedSubL1 = ioCoroCtx -> yieldedSubL1;
+    ioCoroCtx -> subListGen -> subL1Size = ioCoroCtx -> subL1Size;
   } else {
     // ioSubL1 will always hold the sub-lists that contains the first element of L
-    *ioSubL1 = *iL;
-    subCombinationCouplesFixedLSizeGenerator_rec (ioGen, iL + 1,iSizeL - 1, ioSubL1+1, iSubL1RemSize - 1, ioSubL2);
+    *(ioCoroCtx -> yieldedSubL1) = *(ioCoroCtx -> l);
+
+    ioCoroCtx -> subListGen -> l = ioCoroCtx -> l+1;
+    ioCoroCtx -> subListGen -> lSize = ioCoroCtx -> lSize-1;
+    ioCoroCtx -> subListGen -> yieldedSubL1 = ioCoroCtx -> yieldedSubL1+1;
+    ioCoroCtx -> subListGen -> subL1Size = ioCoroCtx -> subL1Size-1;
   }
+
+  ioCoroCtx -> subListGen -> yieldedSubL2 = ioCoroCtx -> yieldedSubL2;
+
+  while (subCombinationCouplesFixedLSizeGenerator_rec(ioCoroCtx ->  subListGen)) {
+    crReturn(1);
+  }
+
+  NB_freeSLCoroutineCtx ((NB_BaseSLCoroutineCtx_t*) (ioCoroCtx -> subListGen));
+  crFinish;
+  return 0;
 }
 
+struct SubCombinationCouplesGeneratorCtx {
+  NB_BaseSLCoroutineCtx_t super;
+  
+  // input values;
+  void ** l;
+  size_t lSize;
 
-void subCombinationCouplesGenerator_run(NB_BaseGenerator_t* ioGen) {
+  // local values
+  struct SubCombinationCouplesGeneratorRec2Ctx* subListGen;
 
-  SubCombinationCouplesGenerator_t* generator = (SubCombinationCouplesGenerator_t*) ioGen;
+  // output values
+  size_t i;
+  // contains in input the adress of the list to be filled
+  // allocated/deallocated automatically at creation/destruction of the context
+  size_t yieldedSubL1Size;
+  size_t yieldedSubL2Size;
 
-  size_t i = 0 ;
-  size_t lSize = generator -> lSize;
-  for (i=0;i*2 <= lSize;++i) {
-    generator -> yieldedSubL1Size = i;
-    generator -> yieldedSubL2Size = lSize - i;
-    subCombinationCouplesFixedLSizeGenerator_rec2 (generator,
-                                                   generator -> l,
-                                                   lSize,
-                                                   generator -> yieldedSubL1,
-                                                   i,
-                                                   generator -> yieldedSubL2);
+  void ** yieldedSubL1;
+  void ** yieldedSubL2;
+   
+};
+
+typedef struct SubCombinationCouplesGeneratorCtx SubCombinationCouplesGeneratorCtx_t;
+
+
+short subCombinationCouplesGenerator(SubCombinationCouplesGeneratorCtx_t* ioCoroCtx) {
+  crBegin;
+
+  for ((ioCoroCtx -> i) = 0; (ioCoroCtx -> i)*2 <= ioCoroCtx -> lSize;++(ioCoroCtx -> i)) {
+
+    ioCoroCtx -> yieldedSubL1Size = ioCoroCtx -> i;
+    ioCoroCtx -> yieldedSubL2Size = ioCoroCtx -> lSize - ioCoroCtx -> i;
+
+    ioCoroCtx -> subListGen = (SubCombinationCouplesGeneratorRec2Ctx_t*) NB_getSLCoroutine(&SubCombinationCouplesGeneratorRec2CtxHolder);
+
+    ioCoroCtx -> subListGen -> l = ioCoroCtx -> l;
+    ioCoroCtx -> subListGen -> lSize = ioCoroCtx -> lSize;
+    ioCoroCtx -> subListGen -> yieldedSubL1 = ioCoroCtx -> yieldedSubL1;
+    ioCoroCtx -> subListGen -> subL1Size = ioCoroCtx -> i;
+    ioCoroCtx -> subListGen -> yieldedSubL2 = ioCoroCtx -> yieldedSubL2;
+
+    while (subCombinationCouplesFixedLSizeGenerator_rec2(ioCoroCtx -> subListGen)) {
+      crReturn(1);
+    }
+
+    NB_freeSLCoroutineCtx ((NB_BaseSLCoroutineCtx_t*) (ioCoroCtx -> subListGen));
   }
+  crFinish;
+  return 0;
 }
 
 // initializer:
-struct SubCombinationCouplesInitializer {
+struct SubCombinationCouplesGeneratorCtxInitializer {
   NB_BaseFunctor_t super;
   size_t subLMaxStaticSize;
 };
-typedef struct SubCombinationCouplesInitializer SubCombinationCouplesInitializer_t;
+typedef struct SubCombinationCouplesGeneratorCtxInitializer SubCombinationCouplesGeneratorCtxInitializer_t;
 
-void subCombinationCouplesInitializer (NB_BaseFunctor_t* iSelf, void* ioGen) {
-  SubCombinationCouplesInitializer_t* self = (SubCombinationCouplesInitializer_t*) iSelf;
-  SubCombinationCouplesGenerator_t* generator = (SubCombinationCouplesGenerator_t*) ioGen;
+void subCombinationCouplesGeneratorCtxInitializer (NB_BaseFunctor_t* iSelf, void* ioCoroCtx) {
+  SubCombinationCouplesGeneratorCtxInitializer_t* self = (SubCombinationCouplesGeneratorCtxInitializer_t*) iSelf;
+  SubCombinationCouplesGeneratorCtx_t* ctx = (SubCombinationCouplesGeneratorCtx_t*) ioCoroCtx;
   
-  generator -> super.run = &subCombinationCouplesGenerator_run;
-  generator -> yieldedSubL1 = (void **) malloc (sizeof (void*) * self -> subLMaxStaticSize);
-  generator -> yieldedSubL2 = (void **) malloc (sizeof (void*) * self -> subLMaxStaticSize);
+  ctx -> yieldedSubL1 = (void **) malloc (sizeof (void*) * self -> subLMaxStaticSize);
+  ctx -> yieldedSubL2 = (void **) malloc (sizeof (void*) * self -> subLMaxStaticSize);
 }
 
 //cleaner:
-struct SubCombinationCouplesCleaner {
+struct SubCombinationCouplesGeneratorCtxCleaner {
   NB_BaseFunctor_t super;
 };
-typedef struct SubCombinationCouplesCleaner SubCombinationCouplesCleaner_t;
+typedef struct SubCombinationCouplesGeneratorCtxCleaner SubCombinationCouplesGeneratorCtxCleaner_t;
 
 
-void subCombinationCouplesCleaner (NB_BaseFunctor_t* iSelf, void* ioGen) {
-  SubCombinationCouplesGenerator_t* generator = (SubCombinationCouplesGenerator_t*) ioGen;
-  if (generator -> yieldedSubL1 != NULL) {
-    free (generator -> yieldedSubL1);
+void subCombinationCouplesGeneratorCtxCleaner (NB_BaseFunctor_t* iSelf, void* ioCoroCtx) {
+  SubCombinationCouplesGeneratorCtx_t* ctx = (SubCombinationCouplesGeneratorCtx_t*) ioCoroCtx;
+  if (ctx -> yieldedSubL1 != NULL) {
+    free (ctx -> yieldedSubL1);
   }
-  if (generator -> yieldedSubL2 != NULL) {
-    free (generator -> yieldedSubL2);
+
+  if (ctx -> yieldedSubL2 != NULL) {
+    free (ctx -> yieldedSubL2);
   }
 }
-
-
-NB_BaseGeneratorHolder_t SubCombinationCouplesGeneratorHolder = {0,};
 
 // ////////////////////////////////////////////////////////////////////////////
 // Basic "Le compte est bon" structures
@@ -726,7 +682,7 @@ inline void tryBestSolution (Node_t *iCurrentTree, unsigned int iTarget, BestSol
 // ////////////////////////////////////////////////////////////////////////////
 // Fixed size algo generator
 // ////////////////////////////////////////////////////////////////////////////
-NB_BaseSLCoroutineCtxHolder_t LcebFixedSizeGeneratorCtxHolder = {0,};
+static NB_BaseSLCoroutineCtxHolder_t LcebFixedSizeGeneratorCtxHolder = {0,};
 
 struct LcebFixedSizeGeneratorCtx {
   NB_BaseSLCoroutineCtx_t super;
@@ -737,7 +693,7 @@ struct LcebFixedSizeGeneratorCtx {
 
   // internal variables:
   Node_t newNode;
-  SubCombinationCouplesGenerator_t* coupleGenerator;
+  SubCombinationCouplesGeneratorCtx_t* coupleGenerator;
 
   struct LcebFixedSizeGeneratorCtx* elmt1CoroCtx;
   struct LcebFixedSizeGeneratorCtx* elmt2CoroCtx;
@@ -773,16 +729,13 @@ short lcebFixedSizeGenerator(LcebFixedSizeGeneratorCtx_t* ioCoroCtx) {
     // in the "Concept of this algorithm" comment
 
     ioCoroCtx -> coupleGenerator =
-      (SubCombinationCouplesGenerator_t*) NB_getFreeGenerator (&SubCombinationCouplesGeneratorHolder);
+        (SubCombinationCouplesGeneratorCtx_t*) NB_getSLCoroutine (&SubCombinationCouplesGeneratorCtxHolder);
     
     ioCoroCtx -> coupleGenerator -> l = (void **) (ioCoroCtx -> l);
     ioCoroCtx -> coupleGenerator -> lSize = ioCoroCtx -> lSize;
-    ioCoroCtx -> coupleGenerator -> super.isAtEnd = 0;
 
-    NB_PREEMPT (ioCoroCtx -> coupleGenerator);
-    while (!ioCoroCtx -> coupleGenerator -> super.isAtEnd) {
+    while (subCombinationCouplesGenerator(ioCoroCtx -> coupleGenerator)) {
       if(ioCoroCtx -> coupleGenerator -> yieldedSubL1Size == 0) {
-        NB_PREEMPT (ioCoroCtx -> coupleGenerator);
         continue;
       }
       ioCoroCtx -> elmt1CoroCtx =
@@ -865,8 +818,8 @@ short lcebFixedSizeGenerator(LcebFixedSizeGeneratorCtx_t* ioCoroCtx) {
         NB_freeSLCoroutineCtx((NB_BaseSLCoroutineCtx_t*) (ioCoroCtx -> elmt2CoroCtx));
       }
       NB_freeSLCoroutineCtx((NB_BaseSLCoroutineCtx_t*) (ioCoroCtx -> elmt1CoroCtx));
-      NB_PREEMPT (ioCoroCtx -> coupleGenerator);
     }
+    NB_freeSLCoroutineCtx((NB_BaseSLCoroutineCtx_t*) (ioCoroCtx -> coupleGenerator));
   }
   crFinish;
   return 0;
@@ -877,7 +830,7 @@ short lcebFixedSizeGenerator(LcebFixedSizeGeneratorCtx_t* ioCoroCtx) {
 // ////////////////////////////////////////////////////////////////////////////
 // all sizes algo generator
 // ////////////////////////////////////////////////////////////////////////////
-NB_BaseSLCoroutineCtxHolder_t LcebAllSizesGeneratorCtxHolder = {0,};
+static NB_BaseSLCoroutineCtxHolder_t LcebAllSizesGeneratorCtxHolder = {0,};
 
 struct LcebAllSizesGeneratorCtx {
   NB_BaseSLCoroutineCtx_t super;
@@ -954,29 +907,39 @@ void le_compte_est_bon(unsigned int* iL, size_t iLSize, unsigned int iTarget) {
   SubCombinationsGeneratorRecCtxHolder.elmtDestructor = NULL;
   SubCombinationsGeneratorRecCtxHolder.ctxSize = sizeof (SubCombinationsGeneratorRecCtx_t);
 
-  // SubCombinationsGeneratorHolder
-  SubCombinationsGeneratorInitializer_t aSubCombinationsGeneratorInitializer;
-  aSubCombinationsGeneratorInitializer.super.run = &subCombinationsGeneratorInitializer;
-  aSubCombinationsGeneratorInitializer.subLMaxStaticSize = iLSize;
+  // SubCombinationsGeneratorCtxHolder
+  SubCombinationsGeneratorCtxInitializer_t aSubCombinationsGeneratorCtxInitializer;
+  aSubCombinationsGeneratorCtxInitializer.super.run = &subCombinationsGeneratorCtxInitializer;
+  aSubCombinationsGeneratorCtxInitializer.subLMaxStaticSize = iLSize;
 
-  SubCombinationsGeneratorCleaner_t aSubCombinationsGeneratorCleaner;
-  aSubCombinationsGeneratorCleaner.super.run = &subCombinationsGeneratorCleaner;
+  SubCombinationsGeneratorCtxCleaner_t aSubCombinationsGeneratorCtxCleaner;
+  aSubCombinationsGeneratorCtxCleaner.super.run = &subCombinationsGeneratorCtxCleaner;
 
-  SubCombinationsGeneratorCtxHolder.elmtConstructor = (NB_BaseFunctor_t*) &aSubCombinationsGeneratorInitializer;
-  SubCombinationsGeneratorCtxHolder.elmtDestructor = (NB_BaseFunctor_t*) &aSubCombinationsGeneratorCleaner;
+  SubCombinationsGeneratorCtxHolder.elmtConstructor = (NB_BaseFunctor_t*) &aSubCombinationsGeneratorCtxInitializer;
+  SubCombinationsGeneratorCtxHolder.elmtDestructor = (NB_BaseFunctor_t*) &aSubCombinationsGeneratorCtxCleaner;
   SubCombinationsGeneratorCtxHolder.ctxSize = sizeof (SubCombinationsGeneratorCtx_t);
 
-  // SubCombinationCouplesGeneratorHolder
-  SubCombinationCouplesInitializer_t aSubCombinationCouplesInitializer;
-  aSubCombinationCouplesInitializer.super.run = &subCombinationCouplesInitializer;
-  aSubCombinationCouplesInitializer.subLMaxStaticSize = iLSize;
+  // SubCombinationCouplesGeneratorRecCtxHolder
+  SubCombinationCouplesGeneratorRecCtxHolder.elmtConstructor = NULL;
+  SubCombinationCouplesGeneratorRecCtxHolder.elmtDestructor = NULL;
+  SubCombinationCouplesGeneratorRecCtxHolder.ctxSize = sizeof (SubCombinationCouplesGeneratorRecCtx_t);
 
-  SubCombinationCouplesCleaner_t aSubCombinationCouplesCleaner;
-  aSubCombinationCouplesCleaner.super.run = &subCombinationCouplesCleaner;
+  // SubCombinationCouplesGeneratorRec2CtxHolder
+  SubCombinationCouplesGeneratorRec2CtxHolder.elmtConstructor = NULL;
+  SubCombinationCouplesGeneratorRec2CtxHolder.elmtDestructor = NULL;
+  SubCombinationCouplesGeneratorRec2CtxHolder.ctxSize = sizeof (SubCombinationCouplesGeneratorRec2Ctx_t);
 
-  SubCombinationCouplesGeneratorHolder.elmtConstructor = (NB_BaseFunctor_t*) &aSubCombinationCouplesInitializer;
-  SubCombinationCouplesGeneratorHolder.elmtDestructor = (NB_BaseFunctor_t*) &aSubCombinationCouplesCleaner;
-  SubCombinationCouplesGeneratorHolder.generatorSize = sizeof (SubCombinationCouplesGenerator_t);
+  // SubCombinationCouplesGeneratorCtxHolder
+  SubCombinationCouplesGeneratorCtxInitializer_t aSubCombinationCouplesGeneratorCtxInitializer;
+  aSubCombinationCouplesGeneratorCtxInitializer.super.run = &subCombinationCouplesGeneratorCtxInitializer;
+  aSubCombinationCouplesGeneratorCtxInitializer.subLMaxStaticSize = iLSize;
+
+  SubCombinationCouplesGeneratorCtxCleaner_t aSubCombinationCouplesGeneratorCtxCleaner;
+  aSubCombinationCouplesGeneratorCtxCleaner.super.run = &subCombinationCouplesGeneratorCtxCleaner;
+
+  SubCombinationCouplesGeneratorCtxHolder.elmtConstructor = (NB_BaseFunctor_t*) &aSubCombinationCouplesGeneratorCtxInitializer;
+  SubCombinationCouplesGeneratorCtxHolder.elmtDestructor = (NB_BaseFunctor_t*) &aSubCombinationCouplesGeneratorCtxCleaner;
+  SubCombinationCouplesGeneratorCtxHolder.ctxSize = sizeof (SubCombinationCouplesGeneratorCtx_t);
 
   // LcebFixedSizeGeneratorHolder
   LcebFixedSizeGeneratorCtxHolder.elmtConstructor = NULL;
@@ -1029,7 +992,9 @@ void le_compte_est_bon(unsigned int* iL, size_t iLSize, unsigned int iTarget) {
 
   NB_freeSLCoroutineCtxPool(&SubCombinationsGeneratorRecCtxHolder);
   NB_freeSLCoroutineCtxPool(&SubCombinationsGeneratorCtxHolder);
-  NB_freePool(&SubCombinationCouplesGeneratorHolder);
+  NB_freeSLCoroutineCtxPool(&SubCombinationCouplesGeneratorRecCtxHolder);
+  NB_freeSLCoroutineCtxPool(&SubCombinationCouplesGeneratorRec2CtxHolder);
+  NB_freeSLCoroutineCtxPool(&SubCombinationCouplesGeneratorCtxHolder);
   NB_freeSLCoroutineCtxPool(&LcebFixedSizeGeneratorCtxHolder);
   NB_freeSLCoroutineCtxPool(&LcebAllSizesGeneratorCtxHolder);
 }
