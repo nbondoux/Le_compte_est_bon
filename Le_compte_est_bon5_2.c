@@ -763,7 +763,6 @@ short lcebFixedSizeGenerator(LcebFixedSizeGeneratorCtx_t* ioCoroCtx) {
     ioCoroCtx -> yieldedNode = (ioCoroCtx ->l)[0];
     crReturn(1);
   } else {
-    Node_t newNode;
     ioCoroCtx -> yieldedNode = &(ioCoroCtx -> newNode);
     ioCoroCtx -> yieldedNode -> type = Node;
 
@@ -828,7 +827,7 @@ short lcebFixedSizeGenerator(LcebFixedSizeGeneratorCtx_t* ioCoroCtx) {
                 
           if (ioCoroCtx -> val1 >= ioCoroCtx -> val2) {
             if (ioCoroCtx -> elmt1 -> type != Node || ioCoroCtx -> elmt1 ->u.Node.op != Add) {
-              newNode.value=ioCoroCtx -> val1 - ioCoroCtx -> val2;
+              ioCoroCtx -> newNode.value=ioCoroCtx -> val1 - ioCoroCtx -> val2;
                     
               ioCoroCtx -> newNode.u.Node.op = Minus;
               crReturn(1);
