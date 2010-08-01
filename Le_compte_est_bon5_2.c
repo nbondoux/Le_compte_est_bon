@@ -13,7 +13,7 @@ typedef struct NB_BaseFunctor NB_BaseFunctor_t;
 
 // generics for stack-less coroutines
 
-// based on the idea of Simon Tatham: http://www.linuxhowtos.org/C_C++/coroutines.htm
+// based on the idea from Simon Tatham: http://www.linuxhowtos.org/C_C++/coroutines.htm
 
 #define crBegin switch(((NB_BaseSLCoroutineCtx_t*) ioCoroCtx) -> line) { case 0:
 #define crReturn(x) do { ((NB_BaseSLCoroutineCtx_t*) ioCoroCtx) -> line=__LINE__; return x; \
