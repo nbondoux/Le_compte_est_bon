@@ -493,7 +493,7 @@ void subCombinationCouplesGeneratorCtxCleaner (NB_BaseFunctor_t* iSelf, void* io
 
 
 struct Node {
-  uint_fast32_t value;
+  uint_fast64_t value;
   union {
     struct { 
       struct Node * ag;
@@ -644,18 +644,18 @@ void cleanNodeVector(Node_t ** ioNodes, size_t iNodeSize) {
 }
 
 
-inline uint_fast32_t valueNode (Node_t * iNodes) {
+inline uint_fast64_t valueNode (Node_t * iNodes) {
   return iNodes->value;
 }
 
 typedef struct {
   Node_t *node;
-  uint_fast32_t delta;
+  uint_fast64_t delta;
 } BestSolution;
 
 inline void tryBestSolution (Node_t *iCurrentTree, unsigned int iTarget, BestSolution* ioBestSolution) {
-  uint_fast32_t currentValue = valueNode (iCurrentTree);
-  uint_fast32_t delta = ioBestSolution -> delta;
+  uint_fast64_t currentValue = valueNode (iCurrentTree);
+  uint_fast64_t delta = ioBestSolution -> delta;
   if (ioBestSolution -> node == NULL ||
       ((currentValue >= iTarget && currentValue - iTarget < ioBestSolution -> delta) ||
        (currentValue < iTarget && iTarget - currentValue < delta))) {
@@ -699,10 +699,10 @@ struct LcebFixedSizeGeneratorCtx {
   struct LcebFixedSizeGeneratorCtx* elmt2CoroCtx;
 
   Node_t* elmt1;
-  uint_fast32_t val1;
+  uint_fast64_t val1;
 
   Node_t* elmt2;
-  uint_fast32_t val2;
+  uint_fast64_t val2;
 
 
   // output variables:
