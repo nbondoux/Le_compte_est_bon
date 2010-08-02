@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <stdint.h>
 
 // a simple functor
 struct NB_BaseFunctor {
@@ -493,7 +493,7 @@ void subCombinationCouplesGeneratorCtxCleaner (NB_BaseFunctor_t* iSelf, void* io
 
 
 struct Node {
-  unsigned int value;
+  uint_fast32_t value;
   union {
     struct { 
       struct Node * ag;
@@ -612,7 +612,7 @@ char * stringFromNode (Node_t * iNode) {
     free(c2);
   } else {
     char n[500];
-    sprintf(n,"%u",iNode->value);
+    sprintf(n,"%u",(unsigned int) iNode->value);
     c = (char *) malloc (sizeof(char) * (strlen(n) + 1));
     strcpy(c,n);
   }
@@ -644,18 +644,18 @@ void cleanNodeVector(Node_t ** ioNodes, size_t iNodeSize) {
 }
 
 
-inline unsigned int valueNode (Node_t * iNodes) {
+inline uint_fast32_t valueNode (Node_t * iNodes) {
   return iNodes->value;
 }
 
 typedef struct {
   Node_t *node;
-  unsigned int delta;
+  uint_fast32_t delta;
 } BestSolution;
 
 inline void tryBestSolution (Node_t *iCurrentTree, unsigned int iTarget, BestSolution* ioBestSolution) {
-  unsigned int currentValue = valueNode (iCurrentTree);
-  unsigned int delta = ioBestSolution -> delta;
+  uint_fast32_t currentValue = valueNode (iCurrentTree);
+  uint_fast32_t delta = ioBestSolution -> delta;
   if (ioBestSolution -> node == NULL ||
       ((currentValue >= iTarget && currentValue - iTarget < ioBestSolution -> delta) ||
        (currentValue < iTarget && iTarget - currentValue < delta))) {
@@ -666,7 +666,7 @@ inline void tryBestSolution (Node_t *iCurrentTree, unsigned int iTarget, BestSol
     }
     
     char * c=stringFromNode(iCurrentTree);
-    printf("Best solution so far: %d = %s \n",currentValue,c);
+    printf("Best solution so far: %u = %s \n",(unsigned int) currentValue,c);
     free(c);
     ioBestSolution -> node = duplicateNode(iCurrentTree);
 
@@ -699,10 +699,10 @@ struct LcebFixedSizeGeneratorCtx {
   struct LcebFixedSizeGeneratorCtx* elmt2CoroCtx;
 
   Node_t* elmt1;
-  unsigned int val1;
+  uint_fast32_t val1;
 
   Node_t* elmt2;
-  unsigned int val2;
+  uint_fast32_t val2;
 
 
   // output variables:
@@ -975,12 +975,12 @@ void le_compte_est_bon(unsigned int* iL, size_t iLSize, unsigned int iTarget) {
     if (bestSolution.delta == 0) {
       char * c;
       c=stringFromNode(bestSolution.node);
-      printf("%d = %s\n",iTarget,c);
+      printf("%u = %s\n",iTarget,c);
       free(c);
     } else {
       char * c;
       c=stringFromNode(bestSolution.node);
-      printf("No Solution found: nearest solution is: %d = %s\n", valueNode (bestSolution.node),c);
+      printf("No Solution found: nearest solution is: %u = %s\n", (unsigned int) valueNode (bestSolution.node),c);
       free(c);
     }
     freeNode (bestSolution.node);
