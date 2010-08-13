@@ -137,34 +137,31 @@ algo2_foreach_op iA iB iBase iTail iBest_res iCible iProf iException=
                             return sol1
                          )
                 )
-
+      
         sol3 <-(case iB of
                    Noeud _ _ _ Mult -> return sol2
+                   Noeud _ _ _ Divi -> return sol2
                    _ -> (
-                         do
-                           sol <- (
-                                   if (val_a > 1 && val_b > 1) then
-                                     next_algo (Noeud (val_a*val_b) iA iB Mult) sol2
-                                   else
-                                     return sol2
-                                  )
-        
-                           (
-                             if (val_b > val_a && val_a > 1  &&  (val_b `mod` val_a) == 0) then
-                               next_algo (Noeud (div val_b val_a) iB iA Divi) sol
-                             else
-                               return sol
-                             )
-                        )
+                     case iA of
+                       Noeud _ _ _ Divi -> return sol2
+                       _ -> (
+                         if (val_a > 1 && val_b > 1) then
+                           next_algo (Noeud (val_a*val_b) iA iB Mult) sol2
+                         else
+                           return sol2
+                         )
+                     )
                )
-        (case iA of
-            Noeud _ _ _ Mult -> return sol3
-            _ -> (
-                  if (val_a >= val_b && val_b > 1  &&  (val_a `mod` val_b) == 0) then
-                    next_algo (Noeud (div val_a val_b) iA iB Divi) sol3
-                  else
-                    return sol3
-                 )
+        sol4 <- (if (val_b > val_a && val_a > 1  &&  (val_b `mod` val_a) == 0) then
+                   next_algo (Noeud (div val_b val_a) iB iA Divi) sol3
+                 else
+                   return sol3
+                )
+        (
+          if (val_a >= val_b && val_b > 1  &&  (val_a `mod` val_b) == 0) then
+            next_algo (Noeud (div val_a val_b) iA iB Divi) sol4
+          else
+            return sol4
           )
 
 

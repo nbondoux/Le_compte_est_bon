@@ -361,33 +361,31 @@ module Le_Compte_Est_Bon
                 end
                 
                 if val1 > 1 and val2 > 1
-                  newNode.value=val1 * val2
-                  newNode.operation = :Mult
+                  if ((elmt1.class != Node or elmt1.operation != :Divi) and
+                      (elmt2.class != Node or elmt2.operation != :Divi))
+                    newNode.value=val1 * val2
+                    newNode.operation = :Mult
+                    yield newNode
+                  end
+                end
+                
+                if(val2 > val1 and val1 > 1 and (val2 % val1) == 0)
+                  newNode.value=val2 / val1
+                  newNode.leftNode = elmt2
+                  newNode.rightNode = elmt1
+                  newNode.operation = :Divi
                   
                   yield newNode
-                end
-                
-                if elmt2.class != Node or elmt2.operation != :Mult  
-                  if(val2 > val1 and val1 > 1 and (val2 % val1) == 0)
-                    newNode.value=val2 / val1
-                    newNode.leftNode = elmt2
-                    newNode.rightNode = elmt1
-                    newNode.operation = :Divi
-                    
-                    yield newNode
-                    newNode.leftNode = elmt1
-                    newNode.rightNode = elmt2
-                  end
+                  newNode.leftNode = elmt1
+                  newNode.rightNode = elmt2
                 end
                 
                 
-                if (elmt1.class != Node or elmt1.operation != :Mult)
-                  if( val1 >= val2 and val2 > 1 and (val1 % val2) == 0)
-                    newNode.value=val1 / val2
-                    newNode.operation = :Divi
-                    
-                    yield newNode
-                  end
+                if( val1 >= val2 and val2 > 1 and (val1 % val2) == 0)
+                  newNode.value=val1 / val2
+                  newNode.operation = :Divi
+                  
+                  yield newNode
                 end
               }
             }      

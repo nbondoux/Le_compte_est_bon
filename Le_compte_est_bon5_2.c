@@ -788,31 +788,31 @@ short lcebFixedSizeGenerator(LcebFixedSizeGeneratorCtx_t* ioCoroCtx) {
           }
 
           if (ioCoroCtx -> val1 > 1 && ioCoroCtx -> val2 > 1) {
-            ioCoroCtx -> newNode.value=ioCoroCtx -> val1 * ioCoroCtx -> val2;
-            ioCoroCtx -> newNode.u.Node.op = Mult;
-            crReturn(1);
-          }    
-
-          if (ioCoroCtx -> elmt2 -> type != Node || ioCoroCtx -> elmt2 ->u.Node.op != Mult) {
-            if(ioCoroCtx -> val2 > ioCoroCtx -> val1 && ioCoroCtx -> val1 > 1 && (ioCoroCtx -> val2 % ioCoroCtx -> val1) == 0) {
-              ioCoroCtx -> newNode.value=ioCoroCtx -> val2 / ioCoroCtx -> val1;
-                    
-              ioCoroCtx -> newNode.u.Node.ag = ioCoroCtx -> elmt2;
-              ioCoroCtx -> newNode.u.Node.ad = ioCoroCtx -> elmt1;
-              ioCoroCtx -> newNode.u.Node.op = Divi;
+            if ((ioCoroCtx -> elmt1 -> type != Node || ioCoroCtx -> elmt1 ->u.Node.op != Divi) &&
+                (ioCoroCtx -> elmt2 -> type != Node || ioCoroCtx -> elmt2 ->u.Node.op != Divi)
+                ) {
+              ioCoroCtx -> newNode.value=ioCoroCtx -> val1 * ioCoroCtx -> val2;
+              ioCoroCtx -> newNode.u.Node.op = Mult;
               crReturn(1);
-              ioCoroCtx -> newNode.u.Node.ag = ioCoroCtx -> elmt1;
-              ioCoroCtx -> newNode.u.Node.ad = ioCoroCtx -> elmt2;
             }
           }
 
-          if (ioCoroCtx -> elmt1 -> type != Node || ioCoroCtx -> elmt1 ->u.Node.op != Mult) {
-            if(ioCoroCtx -> val1 >= ioCoroCtx -> val2 && ioCoroCtx -> val2 > 1 && (ioCoroCtx -> val1 % ioCoroCtx -> val2) == 0) {
-              ioCoroCtx -> newNode.value=ioCoroCtx -> val1 / ioCoroCtx -> val2;
-                    
-              ioCoroCtx -> newNode.u.Node.op = Divi;
-              crReturn(1);
-            }
+          if(ioCoroCtx -> val2 > ioCoroCtx -> val1 && ioCoroCtx -> val1 > 1 && (ioCoroCtx -> val2 % ioCoroCtx -> val1) == 0) {
+            ioCoroCtx -> newNode.value=ioCoroCtx -> val2 / ioCoroCtx -> val1;
+            
+            ioCoroCtx -> newNode.u.Node.ag = ioCoroCtx -> elmt2;
+            ioCoroCtx -> newNode.u.Node.ad = ioCoroCtx -> elmt1;
+            ioCoroCtx -> newNode.u.Node.op = Divi;
+            crReturn(1);
+            ioCoroCtx -> newNode.u.Node.ag = ioCoroCtx -> elmt1;
+            ioCoroCtx -> newNode.u.Node.ad = ioCoroCtx -> elmt2;
+          }
+
+          if(ioCoroCtx -> val1 >= ioCoroCtx -> val2 && ioCoroCtx -> val2 > 1 && (ioCoroCtx -> val1 % ioCoroCtx -> val2) == 0) {
+            ioCoroCtx -> newNode.value=ioCoroCtx -> val1 / ioCoroCtx -> val2;
+            
+            ioCoroCtx -> newNode.u.Node.op = Divi;
+            crReturn(1);
           }
         }
         NB_freeSLCoroutineCtx((NB_BaseSLCoroutineCtx_t*) (ioCoroCtx -> elmt2CoroCtx));

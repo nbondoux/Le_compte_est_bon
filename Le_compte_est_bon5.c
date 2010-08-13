@@ -671,32 +671,32 @@ void lcebFixedSizeGenerator_run(NB_BaseGenerator_t* ioGen) {
           }
 
           if (val1 > 1 && val2 > 1) {
-            newNode.value=val1 * val2;
-            newNode.u.Node.op = Mult;
+            if ((elmt1 -> type != Node || elmt1 ->u.Node.op != Divi) && 
+                (elmt2 -> type != Node || elmt2 ->u.Node.op != Divi)) {
+              newNode.value=val1 * val2;
+              newNode.u.Node.op = Mult;
+              NB_YIELD (generator);
+            }
+          }
+
+          if(val2 > val1 && val1 > 1 && (val2 % val1) == 0) {
+            newNode.value=val2 / val1;
+            
+            newNode.u.Node.ag = elmt2;
+            newNode.u.Node.ad = elmt1;
+            newNode.u.Node.op = Divi;
             NB_YIELD (generator);
-          }    
-
-          if (elmt2 -> type != Node || elmt2 ->u.Node.op != Mult) {
-            if(val2 > val1 && val1 > 1 && (val2 % val1) == 0) {
-              newNode.value=val2 / val1;
-                    
-              newNode.u.Node.ag = elmt2;
-              newNode.u.Node.ad = elmt1;
-              newNode.u.Node.op = Divi;
-              NB_YIELD (generator);
-              newNode.u.Node.ag = elmt1;
-              newNode.u.Node.ad = elmt2;
-            }
+            newNode.u.Node.ag = elmt1;
+            newNode.u.Node.ad = elmt2;
           }
 
-          if (elmt1 -> type != Node || elmt1 ->u.Node.op != Mult) {
-            if(val1 >= val2 && val2 > 1 && (val1 % val2) == 0) {
-              newNode.value=val1 / val2;
-                    
-              newNode.u.Node.op = Divi;
-              NB_YIELD (generator);
-            }
+          if(val1 >= val2 && val2 > 1 && (val1 % val2) == 0) {
+            newNode.value=val1 / val2;
+            
+            newNode.u.Node.op = Divi;
+            NB_YIELD (generator);
           }
+        
           NB_PREEMPT (elmt2Generator);
         }
         NB_PREEMPT (elmt1Generator);

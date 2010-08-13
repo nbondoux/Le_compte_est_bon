@@ -229,7 +229,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int checkedProf, unsigned 
       // for optimizations purposes,
       // the following operations are skipped:
       // a + (b+c), (b+c) -a
-      // a * (b*c), (b*c) /a
+      // a * (b*c), a*(b/c), (a/c)*b
 
       if (val_a > 0 && val_b > 0 &&
           (noeud_b -> type != Noeud || noeud_b -> u.Noeud.op != Plus) ) {
@@ -258,35 +258,34 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int checkedProf, unsigned 
          }
       }
 
-      if (noeud_b -> type != Noeud || noeud_b -> u.Noeud.op != Mult) {
-        if (val_a > 1 && val_b > 1) {
+      if (val_a > 1 && val_b > 1) {
+        if ((noeud_b -> type != Noeud || (noeud_b -> u.Noeud.op != Mult && noeud_b -> u.Noeud.op != Divi)) &&
+            (noeud_a -> type != Noeud || noeud_a -> u.Noeud.op != Divi)) {
           nouv_arbre.valeur=val_a * val_b;
           nouv_arbre.u.Noeud.op = Mult;
           {
             algo(l, taille_lMinusOne, checkedProf, prof, best_res, cible, &nouv_arbre, a);
           }
         }
-
-        if(val_b > val_a && val_a > 1 && (val_b % val_a) == 0) {
-          nouv_arbre.valeur=val_b / val_a;
-          nouv_arbre.u.Noeud.ag = noeud_b;
-          nouv_arbre.u.Noeud.ad = noeud_a;
-          nouv_arbre.u.Noeud.op = Divi;
-          {
-            algo(l, taille_lMinusOne, checkedProf, prof, best_res, cible, &nouv_arbre, a);
-          }
-          nouv_arbre.u.Noeud.ag = noeud_a;
-          nouv_arbre.u.Noeud.ad = noeud_b;
-        }
       }
 
-      if (noeud_a -> type != Noeud || noeud_a -> u.Noeud.op != Mult) {
-        if( val_a >= val_b && val_b > 1 && (val_a % val_b) == 0) {
-          nouv_arbre.valeur=val_a / val_b;
-          nouv_arbre.u.Noeud.op = Divi;
-          {
-            algo(l, taille_lMinusOne, checkedProf, prof, best_res, cible, &nouv_arbre, a);
-          }
+      if(val_b > val_a && val_a > 1 && (val_b % val_a) == 0) {
+        nouv_arbre.valeur=val_b / val_a;
+        nouv_arbre.u.Noeud.ag = noeud_b;
+        nouv_arbre.u.Noeud.ad = noeud_a;
+        nouv_arbre.u.Noeud.op = Divi;
+        {
+          algo(l, taille_lMinusOne, checkedProf, prof, best_res, cible, &nouv_arbre, a);
+        }
+        nouv_arbre.u.Noeud.ag = noeud_a;
+        nouv_arbre.u.Noeud.ad = noeud_b;
+      }
+
+      if( val_a >= val_b && val_b > 1 && (val_a % val_b) == 0) {
+        nouv_arbre.valeur=val_a / val_b;
+        nouv_arbre.u.Noeud.op = Divi;
+        {
+          algo(l, taille_lMinusOne, checkedProf, prof, best_res, cible, &nouv_arbre, a);
         }
       }
       
