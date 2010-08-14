@@ -333,31 +333,30 @@ module Le_Compte_Est_Bon
                 val2 = elmt2.value
                 
                 if val1 > 0 and val2 > 0
-                  newNode.value=val1 + val2
-                  newNode.operation = :Add
-                  yield newNode
+                  if (elmt1.class != Node or elmt1.operation != :Minus) and
+                      (elmt2.class != Node or elmt2.operation != :Minus)
+                    newNode.value=val1 + val2
+                    newNode.operation = :Add
+                    yield newNode
+                  end
                 end
                 
                 if val2 > val1
-                  if elmt2.class != Node or elmt2.operation != :Add
-                    newNode.value=val2 - val1
-                    
-                    newNode.leftNode = elmt2
-                    newNode.rightNode = elmt1
-                    newNode.operation = :Minus
-                    
-                    yield newNode
-                    newNode.leftNode = elmt1
+                  newNode.value=val2 - val1
+                  
+                  newNode.leftNode = elmt2
+                  newNode.rightNode = elmt1
+                  newNode.operation = :Minus
+                  
+                  yield newNode
+                  newNode.leftNode = elmt1
                     newNode.rightNode = elmt2
-                  end
                 end
                 
                 if val1 >= val2
-                  if elmt1.class != Node or elmt1.operation != :Add
-                    newNode.value=val1 - val2
-                    newNode.operation = :Minus
-                    yield newNode
-                  end
+                  newNode.value=val1 - val2
+                  newNode.operation = :Minus
+                  yield newNode
                 end
                 
                 if val1 > 1 and val2 > 1

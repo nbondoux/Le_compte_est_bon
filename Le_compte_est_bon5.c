@@ -643,31 +643,30 @@ void lcebFixedSizeGenerator_run(NB_BaseGenerator_t* ioGen) {
 
             
           if (val1 > 0 && val2 > 0) {
-            newNode.value=val1 + val2;
-            newNode.u.Node.op = Add;
-            NB_YIELD (generator);
+            if ((elmt1 -> type != Node || elmt1 ->u.Node.op != Minus) &&
+                (elmt2 -> type != Node || elmt2 ->u.Node.op != Minus)) {
+              newNode.value=val1 + val2;
+              newNode.u.Node.op = Add;
+              NB_YIELD (generator);
+            }
           }
 
           if (val2 > val1) {
-            if (elmt2 -> type != Node || elmt2 ->u.Node.op != Add) {
-              newNode.value=val2 - val1;
-                    
-              newNode.u.Node.ag = elmt2;
-              newNode.u.Node.ad = elmt1;
-              newNode.u.Node.op = Minus;
-              NB_YIELD (generator);
-              newNode.u.Node.ag = elmt1;
-              newNode.u.Node.ad = elmt2;
-            }
+            newNode.value=val2 - val1;
+            
+            newNode.u.Node.ag = elmt2;
+            newNode.u.Node.ad = elmt1;
+            newNode.u.Node.op = Minus;
+            NB_YIELD (generator);
+            newNode.u.Node.ag = elmt1;
+            newNode.u.Node.ad = elmt2;
           }
                 
           if (val1 >= val2) {
-            if (elmt1 -> type != Node || elmt1 ->u.Node.op != Add) {
-              newNode.value=val1 - val2;
-                    
-              newNode.u.Node.op = Minus;
-              NB_YIELD (generator);
-            }
+            newNode.value=val1 - val2;
+            
+            newNode.u.Node.op = Minus;
+            NB_YIELD (generator);
           }
 
           if (val1 > 1 && val2 > 1) {

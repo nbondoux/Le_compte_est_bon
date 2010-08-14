@@ -228,34 +228,35 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int checkedProf, unsigned 
 
       // for optimizations purposes,
       // the following operations are skipped:
-      // a + (b+c), (b+c) -a
+      // a + (b+c), a + (b-c), (a-c) + b
       // a * (b*c), a*(b/c), (a/c)*b
 
       if (val_a > 0 && val_b > 0 &&
-          (noeud_b -> type != Noeud || noeud_b -> u.Noeud.op != Plus) ) {
+          (noeud_a -> type != Noeud || noeud_a -> u.Noeud.op != Minus) &&
+          (noeud_b -> type != Noeud || (noeud_b -> u.Noeud.op != Plus &&
+                                        noeud_b -> u.Noeud.op != Minus)) ) {
         nouv_arbre.valeur=val_a + val_b;
         nouv_arbre.u.Noeud.op = Plus;
         {
           algo(l, taille_lMinusOne, checkedProf, prof, best_res, cible, &nouv_arbre, a);
         }
-        if (val_b > val_a) {
-          nouv_arbre.valeur=val_b - val_a;
-          nouv_arbre.u.Noeud.ag = noeud_b;
-          nouv_arbre.u.Noeud.ad = noeud_a;
-          
-          nouv_arbre.u.Noeud.op = Moins;
-          algo(l, taille_lMinusOne, checkedProf, prof, best_res, cible, &nouv_arbre, a);
-          nouv_arbre.u.Noeud.ag = noeud_a;
-          nouv_arbre.u.Noeud.ad = noeud_b;
-        }
       }
-
+       
+      if (val_b > val_a) {
+        nouv_arbre.valeur=val_b - val_a;
+        nouv_arbre.u.Noeud.ag = noeud_b;
+        nouv_arbre.u.Noeud.ad = noeud_a;
+        
+        nouv_arbre.u.Noeud.op = Moins;
+        algo(l, taille_lMinusOne, checkedProf, prof, best_res, cible, &nouv_arbre, a);
+        nouv_arbre.u.Noeud.ag = noeud_a;
+        nouv_arbre.u.Noeud.ad = noeud_b;
+      }
+    
       if (val_a >= val_b && val_b > 0) {
-         if (noeud_a -> type != Noeud || noeud_a -> u.Noeud.op != Plus) {
-           nouv_arbre.valeur=val_a - val_b;
-           nouv_arbre.u.Noeud.op = Moins;
-           algo(l, taille_lMinusOne, checkedProf, prof, best_res, cible, &nouv_arbre, a);
-         }
+        nouv_arbre.valeur=val_a - val_b;
+        nouv_arbre.u.Noeud.op = Moins;
+        algo(l, taille_lMinusOne, checkedProf, prof, best_res, cible, &nouv_arbre, a);
       }
 
       if (val_a > 1 && val_b > 1) {
