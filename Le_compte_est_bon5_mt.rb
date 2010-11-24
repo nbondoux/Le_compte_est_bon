@@ -445,12 +445,3 @@ target = inputNumbers.pop
 algo = Le_Compte_Est_Bon.algoNew(target)
 algo.run(inputNumbers)
 
-toto = Array.new
-Le_Compte_Est_Bon.getAllSubCombinationCouples(Le_Compte_Est_Bon.arrayToSinglyLinked([1,2,3,4,5,6,7,8,9,10])) {|a,b| 
-  va = Array.new
-  vb = Array.new
-  a.each {|ea| va.push ea}
-  b.each {|eb| vb.push eb}
-  toto.push [va.sort,vb.sort].sort
-}
-toto.sort.each {|line| puts "#{line[0]} | #{line[1]}"}
