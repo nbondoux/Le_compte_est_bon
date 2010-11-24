@@ -14,7 +14,7 @@ struct struct_arbre {
     struct { 
       struct struct_arbre * ag;
       struct struct_arbre * ad;
-      enum {Plus, Moins, Mult, Divi}  op;
+      enum {Plus, Minus, Mult, Divi}  op;
     } Noeud;
   } u;
   enum {Nombre, Noeud} type;
@@ -65,7 +65,7 @@ void rm_arbre(arbre * a) {
 /*retourne la priorité de l'arbre */
 unsigned int op_priority(arbre * a) {
   if(a-> type == Noeud) {
-    if(a -> u.Noeud.op == Plus || a -> u.Noeud.op == Moins)
+    if(a -> u.Noeud.op == Plus || a -> u.Noeud.op == Minus)
       return 1;
     else if(a -> u.Noeud.op == Mult || a -> u.Noeud.op == Divi)
       return 2;
@@ -96,7 +96,7 @@ char * string_arbre (arbre * a) {
       
     if(a->u.Noeud.op == Plus)
       strcat(c,"+");
-    else if(a->u.Noeud.op == Moins)
+    else if(a->u.Noeud.op == Minus)
       strcat(c,"-");
     else if(a->u.Noeud.op == Mult)
       strcat(c,"*");
@@ -247,7 +247,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int checkedProf, unsigned 
         nouv_arbre.u.Noeud.ag = noeud_b;
         nouv_arbre.u.Noeud.ad = noeud_a;
         
-        nouv_arbre.u.Noeud.op = Moins;
+        nouv_arbre.u.Noeud.op = Minus;
         algo(l, taille_lMinusOne, checkedProf, prof, best_res, cible, &nouv_arbre, a);
         nouv_arbre.u.Noeud.ag = noeud_a;
         nouv_arbre.u.Noeud.ad = noeud_b;
@@ -255,7 +255,7 @@ void algo (arbre ** l,unsigned int taille_l, unsigned int checkedProf, unsigned 
     
       if (val_a >= val_b && val_b > 0) {
         nouv_arbre.valeur=val_a - val_b;
-        nouv_arbre.u.Noeud.op = Moins;
+        nouv_arbre.u.Noeud.op = Minus;
         algo(l, taille_lMinusOne, checkedProf, prof, best_res, cible, &nouv_arbre, a);
       }
 
