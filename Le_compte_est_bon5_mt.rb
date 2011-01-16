@@ -1,4 +1,248 @@
 #!/usr/bin/ruby
+
+require 'thread'
+
+module NB_Job_Framework
+  class DoublyLinkedListElmtAbstract
+    attr_reader :next, :previous
+    protected
+    attr_writer :next, :previous
+    public
+    
+    def initialize
+      @next=nil
+      @previous=nil
+    end
+
+    def addElmtBefore(iElmt)
+      #if needed, remove the element from its current list
+      if not iElmt.next.nil?
+        iElmt.next.previous = iElmt.previous
+      end
+      if not iElmt.previous.nil?
+        iElmt.previous.next = iElmt.next
+      end
+      #then add it to the current list
+      iElmt.next = self
+      iElmt.previous = self.previous
+      @previous.next = iElmt
+      @previous = iElmt
+    end
+
+    def addElmtsBefore(iElmt1, iElmt2)
+      #if needed, remove the elements from their current list
+      if not iElmt2.next.nil?
+        iElmt2.next.previous = iElmt1.previous
+      end
+      if not iElmt1.previous.nil?
+        iElmt1.previous.next = iElmt2.next
+      end
+      #then add them to the current list
+      iElmt2.next = self
+      iElmt1.previous = self.previous
+      @previous.next = iElmt1
+      @previous = iElmt2
+    end
+
+    def rmElmtBefore
+      exPrevious = @previous
+      @previous = previous.previous
+      @previous.next = self
+      exPrevious.previous = nil
+      exPrevious.next = nil
+    end
+
+    def rmElmt
+      @next.rmElmtBefore
+    end
+  end
+
+  class DoublyLinkedListElmtEnd < DoublyLinkedListElmtAbstract
+    attr_reader :list
+    def initialize(iList)
+      @List = iList
+      @next=self
+      @previous=self
+    end
+  end
+
+  class DoublyLinkedList
+    def initialize
+      @end = DoublyLinkedListElmtEnd.new(self)
+    end
+
+    def front
+      @end.next
+    end
+
+    def back
+      @end.previous
+    end
+   
+    def getEnd
+      @end
+    end
+
+    def empty?
+      @end.next.equal? @end
+    end
+    def push(iElmt)
+      @end.addElmtBefore(iElmt)
+    end
+    def pop
+      @end.rmElmtBefore
+    end
+
+    def each(&block)
+      current = front
+      while not current.equal? @end
+        aNext = current.next
+        block.call(current)
+        current=aNext
+      end
+    end
+
+    def reverse_each(&block)
+      current = back
+      while not current.equal? @end
+        aNext = current.previous
+        block.call(current)
+        current=current.aNext
+      end
+    end
+  end
+  
+  class JobAbstract < DoublyLinkedListElmtAbstract
+    attr_accessor :cancelled
+
+    def initialize
+      @cancelled = false
+    end
+    
+    # must implement run(iJobFramework) method, which check regularly
+    # cancelled? as an exit condition
+  end
+  class JobFramework
+    def initialize
+      @bigLock = Mutex.new
+      @condJobListChanged = ConditionVariable.new
+      @jobWaitList = DoublyLinkedList.new
+      @jobExecList = DoublyLinkedList.new
+    end
+    
+    def addJob iJob
+      @bigLock.synchronize {
+        @jobWaitList.push(iJob)
+        @condJobListChanged.signal
+        puts "toto job added"
+      }
+    end
+    
+    private
+    def threadLoop
+      while true
+        currentJob=nil
+        while currentJob.nil?
+          puts "toto #{Thread.current} check new job"
+          @bigLock.synchronize {
+            if @jobWaitList.empty? and @jobExecList.empty?
+              return
+            elsif not @jobWaitList.empty?
+              currentJob = @jobWaitList.front
+              #detach job from waitlist and attach it to execList
+              @jobExecList.push currentJob
+            end
+            puts "toto #{Thread.current} wait for cond var" if currentJob.nil?
+            @condJobListChanged.wait(@bigLock) if currentJob.nil?
+          }
+        end
+        currentJob.run self
+        @bigLock.synchronize {
+          #remove the job from exec list
+          currentJob.rmElmt
+          @condJobListChanged.broadcast
+        }
+      end
+    end
+
+    public
+
+    class AThreadWrapper < DoublyLinkedListElmtAbstract
+      attr_accessor :thread
+      def initialize iThread
+        @thread = iThread
+      end
+    end
+
+    def run iThreadNb
+      threadList = DoublyLinkedList.new
+      i = 0
+      while i < iThreadNb
+        i = i+1
+        puts "toto before thread creation"
+        aNewThread = AThreadWrapper.new(
+             Thread.new {threadLoop}
+                                 )
+        puts "toto thread is born"
+        threadList.push aNewThread
+      end
+
+      threadList.each { |threadWrapper|
+        threadWrapper.thread.join
+        puts "toto thread is dead"
+      }
+    end
+    
+    def destroyJobIf (&block)
+      @bigLock.synchronize {
+        puts "toto waitlist job destructions"
+        @jobWaitList.each {|aJob|
+          if block.call aJob
+            puts "toto destroy a job from waitlist"
+            aJob.rmElmt
+          end
+        }
+        puts "toto execlist job destructions"
+        @jobExecList.each {|aJob|
+          if block.call aJob
+            puts "toto destroy a job from execlist"
+            aJob.cancelled = true
+          end
+        }
+        @condJobListChanged.broadcast
+      }
+    end
+  end
+
+end
+
+#JobFrameWork
+#Mutex
+#Condition si modif des listes
+#jobWaitList
+#jobExecutionList
+
+#addJob
+
+#run(nbThreads)
+#-> créée les threads et retourne quand tous ont fini
+
+#threadLoop
+#1) Si 0 jobs restant ou en court d'execution, quitte
+#2) Sinon, attendre signal pour refaire le même  teste
+
+#3) 
+
+
+#destroyJobIf (&block)
+
+#class A
+#attr_reader :i
+#attr_writer :i
+#end
+
+#end # end of module NB_Job_Framework
+
 #Concept of this algorithm:
 # The value generated (all extracted combinations of numbers by the 4
 # operations) from a list l (size L) are the values made of N numbers
@@ -14,7 +258,7 @@ module Le_Compte_Est_Bon
     attr_writer :next
     
     class SinglyLinkedListEnd
-      def empty
+      def empty?
         true
       end
       def size
@@ -40,7 +284,7 @@ module Le_Compte_Est_Bon
       @@emptyList
     end    
     
-    def empty
+    def empty?
       false
     end
 
@@ -129,8 +373,8 @@ module Le_Compte_Est_Bon
 
   # return all ordered subcombinations of iL;
   # iHead and iRemaining are appended to the respective two results list
-  def Le_Compte_Est_Bon.getSubCombinationCouples_rec (iL,iHead,iRemaining,&block)
-    if iL.empty
+  def Le_Compte_Est_Bon.getSubCombinationCouples_rec(iL,iHead,iRemaining,&block)
+    if iL.empty?
       yield iHead,iRemaining
     else
       nextL = iL.next
@@ -150,8 +394,8 @@ module Le_Compte_Est_Bon
   #principle: pop the first element of the list, generate all ordered 
   #subcombinations of iL, and systematically append to the first list the popped
   #element of iL
-  def Le_Compte_Est_Bon.getAllSubCombinationCouples(iL,&block)
-    if iL.empty
+  def Le_Compte_Est_Bon.getAllSubCombinationCouples(iL,iNumCpu,iCpuExp,&block)
+    if iL.empty?
       yield SinglyLinkedList.emptyList,SinglyLinkedList.emptyList
     else
       nextL = iL.next
@@ -159,7 +403,24 @@ module Le_Compte_Est_Bon
       duplicateL = SinglyLinkedList.new
       duplicateL.content = iL.content
 
-      getSubCombinationCouples_rec(nextL,duplicateL,SinglyLinkedList.emptyList,&block)
+      head = duplicateL
+      remaining = SinglyLinkedList.emptyList
+      while iCpuExp != 0
+        iCpuExp = iCpuExp - 1
+        duplicateL = SinglyLinkedList.new
+        duplicateL.content = nextL.content
+        nextL = nextL.next
+        if iNumCpu & 1 == 1
+          duplicateL.next = head
+          head = duplicateL
+        else
+          duplicateL.next = remaining
+          remaining = duplicateL         
+        end
+        iNumCpu = iNumCpu >> 1
+      end
+
+      getSubCombinationCouples_rec(nextL,head,remaining,&block)
     end
   end
 
@@ -279,7 +540,7 @@ module Le_Compte_Est_Bon
       @bestSolution = BestSolution.new(target)
     end
    
-    def algo_l_size (iL, &block)
+    def algo_l_size (iL, iNumCpu, iCpuExp, &block)
       if iL.next == SinglyLinkedList.emptyList
         # if l.size is one
         
@@ -293,15 +554,15 @@ module Le_Compte_Est_Bon
         # total number of elements is L" part of the algorithm described
         # on top of the file
         
-        Le_Compte_Est_Bon.getAllSubCombinationCouples(iL) {|l1,l2|
+        Le_Compte_Est_Bon.getAllSubCombinationCouples(iL, iNumCpu, iCpuExp) {|l1,l2|
           break if @bestSolution.isSolutionFound
-          if not l1.empty and not l2.empty
+          if not l1.empty? and not l2.empty?
             newNode = Node.new
 
-            algo_l_size(l1) {|elmt1|
+            algo_l_size(l1,0,0) {|elmt1|
               break if @bestSolution.isSolutionFound
 
-              algo_l_size(l2) {|elmt2|
+              algo_l_size(l2,0,0) {|elmt2|
                 break if @bestSolution.isSolutionFound
 
                 newNode.leftNode = elmt1
@@ -376,13 +637,31 @@ module Le_Compte_Est_Bon
       # of size N" part of the algorithm described on top of the file
       
       #gets all combinations of size n verifying iMinLength <= n < iLSize
-
+      cpuExp = 3
+      maxNumCpu = 1 << cpuExp
       Le_Compte_Est_Bon.getSubCombinations(iL,iLSize,1,iLSize) {|sl|
         break if @bestSolution.isSolutionFound
         sl_size = sl.size
-        algo_l_size(sl,&block)
+        if sl_size >= cpuExp + 1
+          numCpu = 0
+          while numCpu < maxNumCpu
+            algo_l_size(sl,numCpu,cpuExp,&block)
+            numCpu = numCpu + 1
+          end
+        else
+          algo_l_size(sl,0,0,&block)
+        end
       }
-      algo_l_size(iL,&block)
+
+      if iLSize >= cpuExp + 1
+        numCpu = 0
+        while numCpu < maxNumCpu
+          algo_l_size(iL,numCpu,cpuExp,&block)
+          numCpu = numCpu + 1
+        end
+      else
+        algo_l_size(iL,0,0,&block)
+      end
     end
 
     private :algo_l_size, :algo_all_sizes
