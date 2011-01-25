@@ -1,4 +1,5 @@
 #!/usr/bin/ruby
+# -*- coding: utf-8 -*-
 
 require 'thread'
 
@@ -110,18 +111,33 @@ module NB_Job_Framework
         current=current.aNext
       end
     end
+
+    def size
+      theSize=0
+      each {|elmt|
+        theSize+=1
+      }
+      theSize
+    end
   end
   
   class JobAbstract < DoublyLinkedListElmtAbstract
     attr_accessor :cancelled
+    attr_accessor :jobFramework
 
     def initialize
       @cancelled = false
+      @jobFramework = nil
     end
     
-    # must implement run(iJobFramework) method, which check regularly
+    def cancelled?
+      cancelled
+    end
+
+    # must implement run method, which check regularly
     # cancelled? as an exit condition
   end
+
   class JobFramework
     def initialize
       @bigLock = Mutex.new
@@ -134,7 +150,7 @@ module NB_Job_Framework
       @bigLock.synchronize {
         @jobWaitList.push(iJob)
         @condJobListChanged.signal
-        puts "toto job added"
+        #puts "toto job added"
       }
     end
     
@@ -143,7 +159,7 @@ module NB_Job_Framework
       while true
         currentJob=nil
         while currentJob.nil?
-          puts "toto #{Thread.current} check new job"
+          #puts "toto #{Thread.current} check new job"
           @bigLock.synchronize {
             if @jobWaitList.empty? and @jobExecList.empty?
               return
@@ -152,15 +168,16 @@ module NB_Job_Framework
               #detach job from waitlist and attach it to execList
               @jobExecList.push currentJob
             end
-            puts "toto #{Thread.current} wait for cond var" if currentJob.nil?
+            #puts "toto #{Thread.current} wait for cond var" if currentJob.nil?
             @condJobListChanged.wait(@bigLock) if currentJob.nil?
           }
         end
-        currentJob.run self
+        currentJob.jobFramework = self
+        currentJob.run
         @bigLock.synchronize {
           #remove the job from exec list
           currentJob.rmElmt
-          @condJobListChanged.broadcast
+          @condJobListChanged.broadcast if @jobWaitList.empty? and @jobExecList.empty?
         }
       end
     end
@@ -175,37 +192,38 @@ module NB_Job_Framework
     end
 
     def run iThreadNb
+      puts "toto joblist size #{@jobWaitList.size}"
       threadList = DoublyLinkedList.new
       i = 0
       while i < iThreadNb
         i = i+1
-        puts "toto before thread creation"
+        #puts "toto before thread creation"
         aNewThread = AThreadWrapper.new(
              Thread.new {threadLoop}
                                  )
-        puts "toto thread is born"
+        #puts "toto thread is born"
         threadList.push aNewThread
       end
 
       threadList.each { |threadWrapper|
         threadWrapper.thread.join
-        puts "toto thread is dead"
+        #puts "toto thread is dead"
       }
     end
     
     def destroyJobIf (&block)
       @bigLock.synchronize {
-        puts "toto waitlist job destructions"
+        #puts "toto waitlist job destructions"
         @jobWaitList.each {|aJob|
           if block.call aJob
-            puts "toto destroy a job from waitlist"
+            #puts "toto destroy a job from waitlist"
             aJob.rmElmt
           end
         }
-        puts "toto execlist job destructions"
+        #puts "toto execlist job destructions"
         @jobExecList.each {|aJob|
           if block.call aJob
-            puts "toto destroy a job from execlist"
+            #puts "toto destroy a job from execlist"
             aJob.cancelled = true
           end
         }
@@ -214,34 +232,7 @@ module NB_Job_Framework
     end
   end
 
-end
-
-#JobFrameWork
-#Mutex
-#Condition si modif des listes
-#jobWaitList
-#jobExecutionList
-
-#addJob
-
-#run(nbThreads)
-#-> créée les threads et retourne quand tous ont fini
-
-#threadLoop
-#1) Si 0 jobs restant ou en court d'execution, quitte
-#2) Sinon, attendre signal pour refaire le même  teste
-
-#3) 
-
-
-#destroyJobIf (&block)
-
-#class A
-#attr_reader :i
-#attr_writer :i
-#end
-
-#end # end of module NB_Job_Framework
+end # end of module NB_Job_Framework
 
 #Concept of this algorithm:
 # The value generated (all extracted combinations of numbers by the 4
@@ -455,7 +446,10 @@ module Le_Compte_Est_Bon
        return 0
      end
     end
-
+    
+    def numberOfFinalNodes
+      @leftNode.numberOfFinalNodes + @rightNode.numberOfFinalNodes
+    end
 
     def to_s
       strLeft = @leftNode.to_s
@@ -500,19 +494,24 @@ module Le_Compte_Est_Bon
       clone
     end
 
+    def numberOfFinalNodes
+      1
+    end
+
     def to_s
       "#{@value}"
     end
   end
 
   class Algo
-    
+       
     class BestSolution
-      attr_reader :node   
-      attr_writer :node
+      attr_accessor :node
       
-      def initialize(iTarget)
+      def initialize(iTarget,iJobFramework)
+        @bigLock = Mutex.new
         @target = iTarget
+        @jobFramework = iJobFramework
         @node = nil
         @delta = nil
       end
@@ -524,23 +523,34 @@ module Le_Compte_Est_Bon
       def tryBestSolution(iNode)
         if not @delta or 
             (iNode.value - @target < @delta and @target - iNode.value < @delta)
-          @delta = @target - iNode.value
-          @delta = - @delta if @delta < 0
-          @node=iNode.duplicateTree
+          @bigLock.synchronize {
+            if not @delta or 
+                (iNode.value - @target < @delta and @target - iNode.value < @delta)
+              @delta = @target - iNode.value
+              @delta = - @delta if @delta < 0
+              @node=iNode.duplicateTree
 
-          puts "Best so far: #{@node.value} = #{@node}"
+              puts "Best so far: #{@node.value} = #{@node}"
+
+              solSize = iNode.numberOfFinalNodes
+              if isSolutionFound
+                @jobFramework.destroyJobIf {|job|                
+                  job.lSize >= solSize
+                }
+              end
+            end
+          }
         end
       end
     end
-
-    attr_reader :target,:bestSolution
+    
+    attr_reader :target
 
     def initialize (iTarget)
       @target = iTarget
-      @bestSolution = BestSolution.new(target)
     end
    
-    def algo_l_size (iL, iNumCpu, iCpuExp, &block)
+    def algo_l_size (iL, iJob, iNumCpu, iCpuExp, &block)
       if iL.next == SinglyLinkedList.emptyList
         # if l.size is one
         
@@ -555,15 +565,15 @@ module Le_Compte_Est_Bon
         # on top of the file
         
         Le_Compte_Est_Bon.getAllSubCombinationCouples(iL, iNumCpu, iCpuExp) {|l1,l2|
-          break if @bestSolution.isSolutionFound
+          break if iJob.cancelled?
           if not l1.empty? and not l2.empty?
             newNode = Node.new
 
-            algo_l_size(l1,0,0) {|elmt1|
-              break if @bestSolution.isSolutionFound
+            algo_l_size(l1, iJob, 0, 0) {|elmt1,dumJob1|
+              break if iJob.cancelled?
 
-              algo_l_size(l2,0,0) {|elmt2|
-                break if @bestSolution.isSolutionFound
+              algo_l_size(l2, iJob, 0, 0) {|elmt2,dumJob2|
+                break if iJob.cancelled?
 
                 newNode.leftNode = elmt1
                 newNode.rightNode = elmt2
@@ -631,63 +641,87 @@ module Le_Compte_Est_Bon
       end 
     end
 
-    def algo_all_sizes (iL, iLSize, &block)    
+    class AJob_algo_l_size < NB_Job_Framework::JobAbstract
+
+      attr_writer :iJob
+      def initialize (iAlgo_l_size,iL, iSubLSize, iNumCpu, iCpuExp, &block)
+        @iAlgo_l_size = iAlgo_l_size
+        @iL = iL
+        @iSubLSize = iSubLSize
+        @iNumCpu = iNumCpu
+        @iCpuExp = iCpuExp
+        @block = block
+      end
+
+      def lSize
+        @iSubLSize
+      end
+
+      def run
+        Le_Compte_Est_Bon.getSubCombinationsFixedLSize(@iL,@iSubLSize,@iL.size) { |subL|
+          break if cancelled?
+          @iAlgo_l_size.call(subL,self,@iNumCpu,@iCpuExp,@block)
+        }
+      end
+
+    end
+      
+
+    def algo_all_sizes (iL, iLSize, iJobFramework, &block)
       # this "algo" calls are used for the 
       # "the values made of N numbers generated by each of its sublists
       # of size N" part of the algorithm described on top of the file
       
-      #gets all combinations of size n verifying iMinLength <= n < iLSize
-      cpuExp = 3
-      maxNumCpu = 1 << cpuExp
-      Le_Compte_Est_Bon.getSubCombinations(iL,iLSize,1,iLSize) {|sl|
-        break if @bestSolution.isSolutionFound
-        sl_size = sl.size
-        if sl_size >= cpuExp + 1
-          numCpu = 0
-          while numCpu < maxNumCpu
-            algo_l_size(sl,numCpu,cpuExp,&block)
-            numCpu = numCpu + 1
-          end
-        else
-          algo_l_size(sl,0,0,&block)
-        end
+      #gets all combinations of size n verifying iMinLength <= n <= iLSize
+
+      aAlgo_l_size = Proc.new {|l,job,numCpu,cpuExp,block|
+        algo_l_size(l,job,numCpu,cpuExp,&block)
       }
 
-      if iLSize >= cpuExp + 1
+      maxCpuExp = 3
+
+      sl_size = 1
+
+      while sl_size <= iLSize
+        cpuExp = maxCpuExp
+        if cpuExp + 1 >= sl_size
+          cpuExp = sl_size - 1
+        end
+        maxNumCpu = 1 << cpuExp
+
         numCpu = 0
         while numCpu < maxNumCpu
-          algo_l_size(iL,numCpu,cpuExp,&block)
-          numCpu = numCpu + 1
+          iJobFramework.addJob(AJob_algo_l_size.new(aAlgo_l_size,iL,sl_size,numCpu,cpuExp,&block))
+          numCpu +=1
         end
-      else
-        algo_l_size(iL,0,0,&block)
+        sl_size +=1
       end
+
+      iJobFramework.run(2)
     end
 
     private :algo_l_size, :algo_all_sizes
     
     def run(iL)
+      jobFramework = NB_Job_Framework::JobFramework.new
+      bestSolution = BestSolution.new(@target,jobFramework)
+      
       l=Le_Compte_Est_Bon.arrayToSinglyLinked(iL.collect {|elmt| FinalNode.new(elmt)})
-      algo_all_sizes(l,l.size()) {|elmt|
-        @bestSolution.tryBestSolution(elmt)
+      algo_all_sizes(l,l.size(),jobFramework) {|elmt|
+        bestSolution.tryBestSolution(elmt)
       }
 
-      if @bestSolution.isSolutionFound
-        puts "#{@target} = #{@bestSolution.node}"
-      elsif @bestSolution.node
-        puts "No Solution; nearest solution is: #{@bestSolution.node.value} = #{@bestSolution.node}"
+      if bestSolution.isSolutionFound
+        puts "#{@target} = #{bestSolution.node}"
+      elsif bestSolution.node
+        puts "No Solution; nearest solution is: #{bestSolution.node.value} = #{bestSolution.node}"
       else
         puts "No Solution"
       end
       
-      return @bestSolution
+      return bestSolution
     end
   end
-
-  def Le_Compte_Est_Bon.algoNew(iTarget)
-    Algo.new(iTarget)
-  end
-
 
 
 end #end of the module
@@ -721,6 +755,6 @@ ARGV.each {|elmt|
 
 target = inputNumbers.pop
 
-algo = Le_Compte_Est_Bon.algoNew(target)
+algo = Le_Compte_Est_Bon::Algo.new(target)
 algo.run(inputNumbers)
 
