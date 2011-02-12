@@ -3,7 +3,82 @@
 
 require 'thread'
 
-module NB_Job_Framework
+module NB_Common
+
+  #note: a SinglyLinkedList is also the first element of the (sub) list
+  class SinglyLinkedListAbstract
+    attr_reader :next
+    attr_writer :next
+    
+    class SinglyLinkedListEnd
+      def empty?
+        true
+      end
+      def size
+        0
+      end
+      def each(&block)
+      end
+      def reverse_each(&block)
+      end
+      
+      def to_s
+        return ""
+      end
+    end
+
+    @@emptyList = SinglyLinkedListEnd.new
+
+    def initialize
+      @next = @@emptyList
+    end
+    
+    def SinglyLinkedListAbstract.emptyList
+      @@emptyList
+    end    
+    
+    def empty?
+      false
+    end
+
+    def size
+      1+@next.size
+    end
+
+    def each(&block)
+      block.call(self)
+      @next.each(&block)
+    end
+
+    def reverse_each(&block)
+      @next.reverse_each(&block)
+      block.call(self)
+    end
+    
+  end
+
+  class SinglyLinkedList < SinglyLinkedListAbstract
+    attr_reader :content
+    attr_writer :content
+  
+    def each(&block)
+      block.call(content)
+      @next.each(&block)
+    end
+
+    def reverse_each(&block)
+      @next.reverse_each(&block)
+      block.call(content)
+    end
+
+    def to_s
+      "#{content.to_s}, "+@next.to_s
+    end   
+  end
+
+  # note: a DoublyLinkedList is an interface for a doubly linked list of
+  # elements inherinting from DoublyLinkedListElmtAbstract
+
   class DoublyLinkedListElmtAbstract
     attr_reader :next, :previous
     protected
@@ -120,8 +195,10 @@ module NB_Job_Framework
       theSize
     end
   end
-  
-  class JobAbstract < DoublyLinkedListElmtAbstract
+end
+
+module NB_Job_Framework
+  class JobAbstract < NB_Common::DoublyLinkedListElmtAbstract
     attr_accessor :cancelled
     attr_accessor :jobFramework
 
@@ -142,8 +219,8 @@ module NB_Job_Framework
     def initialize
       @bigLock = Mutex.new
       @condJobListChanged = ConditionVariable.new
-      @jobWaitList = DoublyLinkedList.new
-      @jobExecList = DoublyLinkedList.new
+      @jobWaitList = NB_Common::DoublyLinkedList.new
+      @jobExecList = NB_Common::DoublyLinkedList.new
     end
     
     def addJob iJob
@@ -184,7 +261,7 @@ module NB_Job_Framework
 
     public
 
-    class AThreadWrapper < DoublyLinkedListElmtAbstract
+    class AThreadWrapper < NB_Common::DoublyLinkedListElmtAbstract
       attr_accessor :thread
       def initialize iThread
         @thread = iThread
@@ -193,7 +270,7 @@ module NB_Job_Framework
 
     def run iThreadNb
       puts "toto joblist size #{@jobWaitList.size}"
-      threadList = DoublyLinkedList.new
+      threadList = NB_Common::DoublyLinkedList.new
       i = 0
       while i < iThreadNb
         i = i+1
@@ -244,80 +321,11 @@ end # end of module NB_Job_Framework
 # no duplicate value is therefore ever generated for l or any other sub-lists
 
 module Le_Compte_Est_Bon
-  class SinglyLinkedListAbstract
-    attr_reader :next
-    attr_writer :next
-    
-    class SinglyLinkedListEnd
-      def empty?
-        true
-      end
-      def size
-        0
-      end
-      def each(&block)
-      end
-      def reverse_each(&block)
-      end
-      
-      def to_s
-        return ""
-      end
-    end
-
-    @@emptyList = SinglyLinkedListEnd.new
-
-    def initialize
-      @next = @@emptyList
-    end
-    
-    def SinglyLinkedListAbstract.emptyList
-      @@emptyList
-    end    
-    
-    def empty?
-      false
-    end
-
-    def size
-      1+@next.size
-    end
-
-    def each(&block)
-      block.call(self)
-      @next.each(&block)
-    end
-
-    def reverse_each(&block)
-      @next.reverse_each(&block)
-      block.call(self)
-    end
-    
-  end
-
-  class SinglyLinkedList < SinglyLinkedListAbstract
-    attr_reader :content
-    attr_writer :content
-  
-    def each(&block)
-      block.call(content)
-      @next.each(&block)
-    end
-
-    def reverse_each(&block)
-      @next.reverse_each(&block)
-      block.call(content)
-    end
-
-    def to_s
-      "#{content.to_s}, "+@next.to_s
-    end   
-  end
-  
+ 
   def Le_Compte_Est_Bon.arrayToSinglyLinked a
-    l = SinglyLinkedList.emptyList
+    l = NB_Common::SinglyLinkedList.emptyList
     a.reverse_each {|elmt|
-      node = SinglyLinkedList.new
+      node = NB_Common::SinglyLinkedList.new
       node.content = elmt
       node.next = l
       l = node
@@ -330,9 +338,9 @@ module Le_Compte_Est_Bon
 
   def Le_Compte_Est_Bon.getSubCombinationsFixedLSize(iL,iL1Size, iLSize,&block)
     if iL1Size == 0
-      yield SinglyLinkedList.emptyList
+      yield NB_Common::SinglyLinkedList.emptyList
     else    
-      duplicate_head = SinglyLinkedList.new
+      duplicate_head = NB_Common::SinglyLinkedList.new
       duplicate_head.content = iL.content
 
       #all combinations that contain head of list
@@ -370,7 +378,7 @@ module Le_Compte_Est_Bon
     else
       nextL = iL.next
 
-      duplicateL = SinglyLinkedList.new
+      duplicateL = NB_Common::SinglyLinkedList.new
       duplicateL.content = iL.content
       duplicateL.next = iRemaining
       getSubCombinationCouples_rec(nextL,iHead,duplicateL,&block)
@@ -387,18 +395,18 @@ module Le_Compte_Est_Bon
   #element of iL
   def Le_Compte_Est_Bon.getAllSubCombinationCouples(iL,iNumCpu,iCpuExp,&block)
     if iL.empty?
-      yield SinglyLinkedList.emptyList,SinglyLinkedList.emptyList
+      yield NB_Common::SinglyLinkedList.emptyList, NB_Common::SinglyLinkedList.emptyList
     else
       nextL = iL.next
 
-      duplicateL = SinglyLinkedList.new
+      duplicateL = NB_Common::SinglyLinkedList.new
       duplicateL.content = iL.content
 
       head = duplicateL
-      remaining = SinglyLinkedList.emptyList
+      remaining = NB_Common::SinglyLinkedList.emptyList
       while iCpuExp != 0
         iCpuExp = iCpuExp - 1
-        duplicateL = SinglyLinkedList.new
+        duplicateL = NB_Common::SinglyLinkedList.new
         duplicateL.content = nextL.content
         nextL = nextL.next
         if iNumCpu & 1 == 1
@@ -551,7 +559,7 @@ module Le_Compte_Est_Bon
     end
    
     def algo_l_size (iL, iJob, iNumCpu, iCpuExp, &block)
-      if iL.next == SinglyLinkedList.emptyList
+      if iL.next == NB_Common::SinglyLinkedList.emptyList
         # if l.size is one
         
         elmt = iL.content
