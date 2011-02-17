@@ -874,7 +874,8 @@ clientServerMode = nil
 
 opts = GetoptLong.new(
   [ "--client", "-c", GetoptLong::REQUIRED_ARGUMENT],
-  [ "--server", "-s", GetoptLong::OPTIONAL_ARGUMENT]
+  [ "--server", "-s", GetoptLong::OPTIONAL_ARGUMENT],
+  [ "--help", "-h", GetoptLong::NO_ARGUMENT]
 )
 
 # process the parsed options
@@ -885,23 +886,24 @@ opts.each { |opt, arg|
     uri=arg
     isError = true if not clientServerMode.nil?
     clientServerMode=:client_mode
-  elsif  opt == "--server"
+  elsif opt == "--server"
     uri=arg if arg != ""
     isError = true if not clientServerMode.nil?
     clientServerMode=:server_mode
+  elsif opt == "--help"
+    help_message execName
+    exit 0
   end
   break if isError
 }
+
 clientServerMode ||= :server_client_mode
-if isError or clientServerMode == :client_mode and ARGV.size != 0
+if isError or clientServerMode == :client_mode and ARGV.size != 0 or 
+    clientServerMode != :client_mode and ARGV.size == 0
   help_message execName
   exit 1
 end
 
-if ARGV.include? "-h" or ARGV.include? "--help"
-  help_message execName
-  exit 0
-end
 
 inputNumbers = Array.new
 if clientServerMode != :client_mode

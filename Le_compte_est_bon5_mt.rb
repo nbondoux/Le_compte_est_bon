@@ -577,10 +577,10 @@ module Le_Compte_Est_Bon
           if not l1.empty? and not l2.empty?
             newNode = Node.new
 
-            algo_l_size(l1, iJob, 0, 0) {|elmt1,dumJob1|
+            algo_l_size(l1, iJob, 0, 0) {|elmt1|
               break if iJob.cancelled?
 
-              algo_l_size(l2, iJob, 0, 0) {|elmt2,dumJob2|
+              algo_l_size(l2, iJob, 0, 0) {|elmt2|
                 break if iJob.cancelled?
 
                 newNode.leftNode = elmt1
