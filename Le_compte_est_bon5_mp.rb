@@ -4,6 +4,11 @@
 require 'getoptlong'
 require 'drb'
 
+# NB Note: this is really ugly and dependant of DRb version, but it is needed to fix a bug
+def DRb::here?(iUri)
+  (self.uri rescue nil) == iUri
+end
+
 module NB_Common
 
   #note: a SinglyLinkedList is also the first element of the (sub) list
@@ -576,6 +581,7 @@ module Le_Compte_Est_Bon
       include NB_Common::DoublyLinkedListElmtMixin
 
       attr_reader :serverObject, :iL, :iSubLSize, :iNumCpu, :iCpuExp, :remoteClients
+      attr_accessor :cancelled
       def initialize(iServerObject, iL, iSubLSize, iNumCpu, iCpuExp, &block)
         initialize_DoublyLinkedListElmtMixin
 
@@ -586,6 +592,7 @@ module Le_Compte_Est_Bon
         @iNumCpu = iNumCpu
         @iCpuExp = iCpuExp
         @remoteClients = Array.new
+        @cancelled = false
       end
 
     end
@@ -618,6 +625,7 @@ module Le_Compte_Est_Bon
         if iJob.iSubLSize != @lastEnqueuedJobSize
           @jobs.push(JobListContainer.new)
         end
+        @lastEnqueuedJobSize = iJob.iSubLSize
         @jobs.back.push(iJob)
       end
 
@@ -627,6 +635,7 @@ module Le_Compte_Est_Bon
           return nil
         else
           jobsForCurrentSize = @jobs.front
+
           if jobsForCurrentSize.empty?
             jobsForCurrentSize =jobsForCurrentSize.next
             jobsForCurrentSize.rmElmtBefore
@@ -636,7 +645,7 @@ module Le_Compte_Est_Bon
             job.remoteClients.push(iClient)
             jobsForCurrentSize.push job
             begin
-              iClient.cancelled = false
+              iClient.cancelled = false             
               return job
             rescue
               return nil
@@ -654,20 +663,21 @@ module Le_Compte_Est_Bon
         #let's cancel all jobs being currently treated for the same size
         jobListForCurrentSize.each {|aJob|
           aJob.remoteClients.each {|client|
+            aJob.cancelled = true
             begin
               client.cancelled = true
             rescue
               #we lost the client ...
             end
           }
+          @finishedJobs.push aJob
         }
 
         #let's remove all job lists for bigger sizes
         jobListForNextSize = jobListForCurrentSize.next
         while jobListForNextSize.class != NB_Common::DoublyLinkedListElmtEnd
-          jobListForNextSize2 = jobListForCurrentSize.next
           jobListForNextSize.rmElmt
-          jobListForNextSize = jobListForNextSize2
+          jobListForNextSize = jobListForCurrentSize.next
         end
       end
 
@@ -679,13 +689,17 @@ module Le_Compte_Est_Bon
           #this job shouldn't be referenced anyx where; it can be garbage collected
           iJob.rmElmt
         else
-          iJob.remoteClients.each {|client|
-            begin
-              client.cancelled = true
-            rescue
-              #we lost the client ...
-            end
-          }        
+          if not iJob.cancelled
+            iJob.cancelled = true
+            iJob.remoteClients.each {|client|
+              begin
+                client.cancelled = true
+              rescue
+                #puts "client #{iClient.__drburi} lost ..."
+                #we lost the client ...
+              end
+            }
+          end  
           #detach the job from current list and push it in the to be deleted jobs
           @finishedJobs.push iJob
         end
@@ -728,7 +742,7 @@ module Le_Compte_Est_Bon
       
       #gets all combinations of size n verifying iMinLength <= n <= iLSize
 
-      maxCpuExp = 3
+      maxCpuExp = 5
 
       sl_size = 1
 
@@ -755,8 +769,9 @@ module Le_Compte_Est_Bon
       srand
       
       if clientServerMode == :server_client_mode
-        @uri ||= "drbunix:/tmp/socket.lecompteestbon"#.#{rand(1000000)}"
+        @uri ||= "drbunix:/tmp/socket.lecompteestbon.serv.#{rand(1000000)}"
       end
+      
 
       pidFromFork = nil
       childPids = nil
@@ -794,7 +809,7 @@ module Le_Compte_Est_Bon
 
       elsif (clientServerMode == :server_client_mode and pidFromFork.nil?) or clientServerMode == :client_mode
         leCompteEstBonClient = LeCompteEstBonClient.new
-        DRb.start_service
+        DRb.start_service("drbunix:/tmp/socket.lecompteestbon.#{rand(1000000)}",nil)
 
         isConnectionOk = false
         while not isConnectionOk
@@ -844,7 +859,8 @@ module Le_Compte_Est_Bon
 end #end of the module
 
 def help_message(iExecName)
-  puts "#{iExecName} number1 [number 2 [number 3 ...]] target\n"
+  puts "#{iExecName} [{-s ,--server=}[uri] --] number1 [number 2 [number 3 ...]] target\n"
+  puts "#{iExecName} [{-c ,--client=}uri]"
 end
 
 execName = $0
@@ -857,33 +873,27 @@ clientServerMode = nil
 
 
 opts = GetoptLong.new(
-  [ "--client", "-c", GetoptLong::NO_ARGUMENT],
-  [ "--server", "-s", GetoptLong::NO_ARGUMENT]
+  [ "--client", "-c", GetoptLong::REQUIRED_ARGUMENT],
+  [ "--server", "-s", GetoptLong::OPTIONAL_ARGUMENT]
 )
 
 # process the parsed options
 isError = false
+uri = nil
 opts.each { |opt, arg|
   if opt == "--client"
+    uri=arg
     isError = true if not clientServerMode.nil?
     clientServerMode=:client_mode
   elsif  opt == "--server"
+    uri=arg if arg != ""
     isError = true if not clientServerMode.nil?
     clientServerMode=:server_mode
   end
   break if isError
 }
 clientServerMode ||= :server_client_mode
-if isError or clientServerMode == :client_mode and ARGV.size != 1
-  help_message execName
-  exit 1
-end
-
-if clientServerMode == :client_mode
-  uri = ARGV[0]
-end
-
-if clientServerMode != :client_mode and ARGV.size < 2
+if isError or clientServerMode == :client_mode and ARGV.size != 0
   help_message execName
   exit 1
 end
