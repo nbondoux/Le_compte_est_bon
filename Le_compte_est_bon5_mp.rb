@@ -1,7 +1,7 @@
 #!/usr/bin/ruby
 # -*- coding: utf-8 -*-
 
-require 'thread'
+require 'getoptlong'
 require 'drb'
 
 module NB_Common
@@ -80,13 +80,14 @@ module NB_Common
   # note: a DoublyLinkedList is an interface for a doubly linked list of
   # elements inherinting from DoublyLinkedListElmtAbstract
 
-  class DoublyLinkedListElmtAbstract
+  module DoublyLinkedListElmtMixin
     attr_reader :next, :previous
-    protected
     attr_writer :next, :previous
+    protected
+
     public
     
-    def initialize
+    def initialize_DoublyLinkedListElmtMixin
       @next=nil
       @previous=nil
     end
@@ -134,12 +135,28 @@ module NB_Common
       @next.rmElmtBefore
       self
     end
+
+    def list
+      aPrevious = @previous
+      while aPrevious.class != DoublyLinkedListElmtEnd
+        return nil if aPrevious.nil?
+        aPrevious=aPrevious.previous
+      end
+      return aPrevious.list
+    end
+  end
+  
+  class DoublyLinkedListElmtAbstract
+    include DoublyLinkedListElmtMixin
+    def initialize
+      initialize_DoublyLinkedListElmtMixin
+    end
   end
 
   class DoublyLinkedListElmtEnd < DoublyLinkedListElmtAbstract
     attr_reader :list
     def initialize(iList)
-      @List = iList
+      @list = iList
       @next=self
       @previous=self
     end
@@ -418,24 +435,21 @@ module Le_Compte_Est_Bon
   class Algo
 
     class BestSolutionDescriptor
+      include DRb::DRbUndumped
       # size of the exact solution currently found
-      attr_accessor :sizeOfBestExactSolution, :delta
+      attr_accessor :delta
       def initialize
-        @sizeOfBestExactSolution=nil
         @delta=nil
       end
     end
 
     class BestSolution
       attr_accessor :node, :target
-      attr_accessor :bestSolutionDescriptor
       
-      def initialize(iTarget, iMasterSolutionHolder)
-        @bigLock = Mutex.new
+      def initialize(iTarget, iJob)
         @target = iTarget
         @node = nil
-        @masterSolutionHolder = iMasterSolutionHolder
-        @bestSolutionDescriptor = BestSolutionDescriptor.new
+        @remoteJob = iJob
         @delta = nil
       end
 
@@ -446,37 +460,29 @@ module Le_Compte_Est_Bon
       def tryBestSolution(iNode)
         if not @delta or 
             (iNode.value - @target < @delta and @target - iNode.value < @delta)
-          @bigLock.synchronize {
+          @delta = @target - iNode.value
+          @delta = - @delta if @delta < 0
+          bestSolutionDescriptor = @remoteJob.serverObject.bestSolutionDescriptor
 
-            if not @bestSolutionDescriptor.delta or 
-                (iNode.value - @target < @bestSolutionDescriptor.delta and @target - iNode.value < @bestSolutionDescriptor.delta)
-              @delta = @target - iNode.value
-              @delta = - @delta if @delta < 0
-              if (@bestSolutionDescriptor.delta.nil? or @delta < @bestSolutionDescriptor.delta)
-
-                @node=iNode.duplicateTree
-                @masterSolutionHolder.pushBestSolutionDescriptor(iNode,@delta)
-                # in order to have the right value before next poll; not mandatory
-                @bestSolutionDescriptor.delta = @delta
-              end
-            end
-          }
+          @node=iNode.duplicateTree
+          @remoteJob.serverObject.pushBestSolution(iNode,@remoteJob)
+          @delta = bestSolutionDescriptor.delta
+          # in order to have the right value before next poll; not mandatory
         end
       end
       
-      def updateBestSolutionDescriptor(iBestSolutionDescriptor)
-        @bigLock.synchronize {
-          @BestSolutionDescriptor = iBestSolutionDescriptor
-        }
-      end
     end
-    attr_reader :target
+    attr_reader :target, :inputNumbers, :uri, :clientServerMode
 
-    def initialize (iTarget)
+    def initialize (iInputNumbers,iTarget,iClientServerMode,iUri)
       @target = iTarget
+      @inputNumbers = iInputNumbers
+      @uri = iUri
+      @clientServerMode = iClientServerMode
     end
    
-    def algo_l_size (iL, iNumCpu, iCpuExp, &block)
+    def algo_l_size (iL, iNumCpu, iCpuExp, iClientInstance, &block)
+      return if iClientInstance.cancelled?
       if iL.next == NB_Common::SinglyLinkedList.emptyList
         # if l.size is one
         
@@ -491,11 +497,14 @@ module Le_Compte_Est_Bon
         # on top of the file
         
         Le_Compte_Est_Bon.getAllSubCombinationCouples(iL, iNumCpu, iCpuExp) {|l1,l2|
+          break if iClientInstance.cancelled?
           if not l1.empty? and not l2.empty?
             newNode = Node.new
 
-            algo_l_size(l1, 0, 0) {|elmt1,dumJob1|
-              algo_l_size(l2, 0, 0) {|elmt2,dumJob2|
+            algo_l_size(l1, 0, 0, iClientInstance) {|elmt1|
+              break if iClientInstance.cancelled?
+              algo_l_size(l2, 0, 0, iClientInstance) {|elmt2|
+                break if iClientInstance.cancelled?
                 newNode.leftNode = elmt1
                 newNode.rightNode = elmt2
                 val1 = elmt1.value
@@ -563,64 +572,152 @@ module Le_Compte_Est_Bon
     end
 
     class AJob_algo_l_size
-      attr_reader :iL, :iSubLSize, :iNumCpu, :iCpuExp
-      def initialize(iL, iSubLSize, iNumCpu, iCpuExp, &block)
+      include DRb::DRbUndumped
+      include NB_Common::DoublyLinkedListElmtMixin
+
+      attr_reader :serverObject, :iL, :iSubLSize, :iNumCpu, :iCpuExp, :remoteClients
+      def initialize(iServerObject, iL, iSubLSize, iNumCpu, iCpuExp, &block)
+        initialize_DoublyLinkedListElmtMixin
+
+        @serverObject = iServerObject
+
         @iL = iL
         @iSubLSize = iSubLSize
         @iNumCpu = iNumCpu
         @iCpuExp = iCpuExp
+        @remoteClients = Array.new
       end
 
     end
       
     class LeCompteEstBonServer
-      attr_reader :bestNode, :delta
+      include DRb::DRbUndumped
+      attr_reader :bestNode, :delta, :target, :bestSolutionDescriptor
 
-      def initialize
+      def initialize(iTarget)
         @bestNode = nil
         @delta = nil
+        @target = iTarget
         @jobs = NB_Common::DoublyLinkedList.new
+        @lastEnqueuedJobSize = 0
+        @finishedJobs = NB_Common::DoublyLinkedList.new
         @bestSolutionDescriptor = BestSolutionDescriptor.new
       end
       
-      class JobContainer < NB_Common::DoublyLinkedListElmtAbstract
-        attr_reader :job
-        def initialize(iJob)
-          @job=iJob
+      class JobListContainer < NB_Common::DoublyLinkedList
+        include NB_Common::DoublyLinkedListElmtMixin
+
+        def initialize(*iVal)
+          super(*iVal)
+          initialize_DoublyLinkedListElmtMixin
         end
       end
+
       
       def enqueueJob(iJob)
-        @jobs.push(JobContainer.new(iJob))
-      end
-
-      def dequeueJob
-        if @jobs.empty?
-          nil
-        else
-          @jobs.pop_front.job
+        if iJob.iSubLSize != @lastEnqueuedJobSize
+          @jobs.push(JobListContainer.new)
         end
+        @jobs.back.push(iJob)
       end
 
-      def pushBestSolutionDescriptor(iNode,iDelta)
-        solutionSize = iNode.numberOfFinalNodes
-        if @delta.nil? or iDelta < @delta or (@delta == 0 and iDelta == 0 and
-             @bestSolutionDescriptor.sizeOfBestExactSolution > solutionSize)
-
-          @bestNode = iNode
-          @delta = iDelta
-          @bestSolutionDescriptor.delta = iDelta
-
-          puts "Best so far: #{@bestNode.value} = #{@bestNode}"
-          if delta == 0
-            @bestSolutionDescriptor.sizeOfBestExactSolution = solutionSize if @delta == 0
-            @jobs.clear
+      def dequeueJob(iClient)
+        if @jobs.empty?
+          DRb.stop_service
+          return nil
+        else
+          jobsForCurrentSize = @jobs.front
+          if jobsForCurrentSize.empty?
+            jobsForCurrentSize =jobsForCurrentSize.next
+            jobsForCurrentSize.rmElmtBefore
+          end
+          if jobsForCurrentSize.class != NB_Common::DoublyLinkedListElmtEnd
+            job = jobsForCurrentSize.pop_front
+            job.remoteClients.push(iClient)
+            jobsForCurrentSize.push job
+            begin
+              iClient.cancelled = false
+              return job
+            rescue
+              return nil
+            end
+          else
+            DRb.stop_service
+            return nil
           end
         end
       end
 
-      def getBestSolutionDescriptor
-        @bestSolutionDescriptor
+      def jobGaveASolution(iJob)
+        jobListForCurrentSize = iJob.list
+        
+        #let's cancel all jobs being currently treated for the same size
+        jobListForCurrentSize.each {|aJob|
+          aJob.remoteClients.each {|client|
+            begin
+              client.cancelled = true
+            rescue
+              #we lost the client ...
+            end
+          }
+        }
+
+        #let's remove all job lists for bigger sizes
+        jobListForNextSize = jobListForCurrentSize.next
+        while jobListForNextSize.class != NB_Common::DoublyLinkedListElmtEnd
+          jobListForNextSize2 = jobListForCurrentSize.next
+          jobListForNextSize.rmElmt
+          jobListForNextSize = jobListForNextSize2
+        end
+      end
+
+      # to be called by any client process at the end of process of a job,
+      # to unregister the process, and cancell any other process working on the job
+      def finishJob(iClient,iJob)
+        iJob.remoteClients.delete(iClient)
+        if iJob.remoteClients.empty?
+          #this job shouldn't be referenced anyx where; it can be garbage collected
+          iJob.rmElmt
+        else
+          iJob.remoteClients.each {|client|
+            begin
+              client.cancelled = true
+            rescue
+              #we lost the client ...
+            end
+          }        
+          #detach the job from current list and push it in the to be deleted jobs
+          @finishedJobs.push iJob
+        end
+      end
+
+      def pushBestSolution(iNode, iJob)
+        value = iNode.value
+        delta = value - target
+        delta = - delta if delta < 0
+        solutionSize = iNode.numberOfFinalNodes
+        if @delta.nil? or delta < @delta
+          @bestNode = iNode
+          @delta = delta
+          @bestSolutionDescriptor.delta = delta
+          puts "Best so far: #{@bestNode.value} = #{@bestNode}"
+          if delta == 0
+            jobGaveASolution(iJob)
+          end
+        end
+      end
+    end
+
+    class LeCompteEstBonClient
+      include DRb::DRbUndumped
+      attr_accessor :bestSolutionDescriptor,:cancelled
+
+      def initialize
+        @cancelled=false
+        @bestSolutionDescriptor = BestSolutionDescriptor.new
+      end
+      def cancelled?
+        @cancelled
       end
     end
 
@@ -644,7 +741,7 @@ module Le_Compte_Est_Bon
 
         numCpu = 0
         while numCpu < maxNumCpu
-          iLeCompteEstBonServer.enqueueJob(AJob_algo_l_size.new(iL,sl_size,numCpu,cpuExp))
+          iLeCompteEstBonServer.enqueueJob(AJob_algo_l_size.new(iLeCompteEstBonServer,iL,sl_size,numCpu,cpuExp))
           numCpu +=1
         end
         sl_size +=1
@@ -654,41 +751,51 @@ module Le_Compte_Est_Bon
 
     private :algo_l_size, :algo_all_sizes
     
-    def run(iL)
+    def run()
       srand
-     
-      uri = "drbunix:/tmp/socket.lecompteestbon"#.#{rand(1000000)}"
+      
+      if clientServerMode == :server_client_mode
+        @uri ||= "drbunix:/tmp/socket.lecompteestbon"#.#{rand(1000000)}"
+      end
 
-
-      # create the child processes !!!!
-      nbProcesses = 2
-      childPids = Array.new
-      i=0
       pidFromFork = nil
-
-
-      while i < nbProcesses
-        i += 1
-        pidFromFork = Kernel.fork
-        break if pidFromFork.nil?
-        childPids.push pidFromFork
+      childPids = nil
+      if clientServerMode == :server_client_mode
+        # create the child processes !!!!
+        nbProcesses = 2
+        childPids = Array.new
+        i=0
+        while i < nbProcesses
+          i += 1
+          pidFromFork = Kernel.fork
+          break if pidFromFork.nil?
+          childPids.push pidFromFork
+        end
       end
       
-      if not pidFromFork.nil?
-        leCompteEstBonServer = LeCompteEstBonServer.new
+      if (clientServerMode == :server_client_mode and not pidFromFork.nil?) or clientServerMode == :server_mode
+        leCompteEstBonServer = LeCompteEstBonServer.new(@target)
 
-        l=Le_Compte_Est_Bon.arrayToSinglyLinked(iL.collect {|elmt| FinalNode.new(elmt)})
+        l=Le_Compte_Est_Bon.arrayToSinglyLinked(@inputNumbers.collect {|elmt| FinalNode.new(elmt)})
         algo_all_sizes(l,l.size(),leCompteEstBonServer)
 
         DRb.start_service(uri, leCompteEstBonServer)
+        if clientServerMode == :server_mode
+          puts DRb.uri
+        end
 
-        # quietly wait for children's death
-        childPids.each {|pid|
-          Process.wait(pid)
-        }
-        DRb.stop_service
+        DRb.thread.join
+        if (clientServerMode == :server_client_mode)
+          # quietly wait for children's death
+          childPids.each {|pid|
+            Process.wait(pid)
+          }
+        end
 
-      else
+      elsif (clientServerMode == :server_client_mode and pidFromFork.nil?) or clientServerMode == :client_mode
+        leCompteEstBonClient = LeCompteEstBonClient.new
+        DRb.start_service
+
         isConnectionOk = false
         while not isConnectionOk
           begin
@@ -699,36 +806,25 @@ module Le_Compte_Est_Bon
 
           end
         end
-        
-        bestSolution = BestSolution.new(@target,leCompteEstBonServer)
-        
+              
         currentJobSize = 0
-        
-        aSolutionPollerThread = Thread.new {
-          while true
-            sleep 3
-            remoteBestSolution = leCompteEstBonServer.getBestSolutionDescriptor
-            if not remoteBestSolution.sizeOfBestExactSolution.nil? and \
-              remoteBestSolution.sizeOfBestExactSolution <= currentJobSize
-              # not need to pursue; a solution at least as good as the one we are looking for
-              # has been found
-              Kernel.exit! 0
-            end
-            bestSolution.updateBestSolutionDescriptor(remoteBestSolution)
-          end
-        }
-         
-        theJob = leCompteEstBonServer.dequeueJob
+                
+        theJob = leCompteEstBonServer.dequeueJob(leCompteEstBonClient)
+
         while not theJob.nil?
+          bestSolution = BestSolution.new(theJob.serverObject.target,theJob)
           currentJobSize = theJob.iSubLSize
 
-          Le_Compte_Est_Bon.getSubCombinationsFixedLSize(theJob.iL,theJob.iSubLSize,iL.size) { |subL|
-            algo_l_size(subL,theJob.iNumCpu,theJob.iCpuExp) {|elmt|
+          Le_Compte_Est_Bon.getSubCombinationsFixedLSize(theJob.iL,theJob.iSubLSize,theJob.iL.size) { |subL|
+            break if leCompteEstBonClient.cancelled?
+            algo_l_size(subL,theJob.iNumCpu,theJob.iCpuExp,leCompteEstBonClient) {|elmt|
               bestSolution.tryBestSolution(elmt)
             }
           }
-          theJob = leCompteEstBonServer.dequeueJob
-        end         
+          leCompteEstBonServer.finishJob(leCompteEstBonClient,theJob)
+          theJob = leCompteEstBonServer.dequeueJob(leCompteEstBonClient)
+        end
+        DRb.stop_service
         Kernel.exit! 0
       end
       
@@ -753,7 +849,41 @@ end
 
 execName = $0
 
-if ARGV.size < 2
+clientServerMode = nil
+#the different values are
+#:server_client_mode (the executable do both the tasks)
+#:client_mode
+#:server_mode
+
+
+opts = GetoptLong.new(
+  [ "--client", "-c", GetoptLong::NO_ARGUMENT],
+  [ "--server", "-s", GetoptLong::NO_ARGUMENT]
+)
+
+# process the parsed options
+isError = false
+opts.each { |opt, arg|
+  if opt == "--client"
+    isError = true if not clientServerMode.nil?
+    clientServerMode=:client_mode
+  elsif  opt == "--server"
+    isError = true if not clientServerMode.nil?
+    clientServerMode=:server_mode
+  end
+  break if isError
+}
+clientServerMode ||= :server_client_mode
+if isError or clientServerMode == :client_mode and ARGV.size != 1
+  help_message execName
+  exit 1
+end
+
+if clientServerMode == :client_mode
+  uri = ARGV[0]
+end
+
+if clientServerMode != :client_mode and ARGV.size < 2
   help_message execName
   exit 1
 end
@@ -764,18 +894,19 @@ if ARGV.include? "-h" or ARGV.include? "--help"
 end
 
 inputNumbers = Array.new
-
-ARGV.each {|elmt|
-  i = elmt.to_i
-  if (i < 0)
-    puts "Input numbers must be positive !!!"
-    exit 1
-  end
-  inputNumbers.push i
-}
-
+if clientServerMode != :client_mode
+  
+  ARGV.each {|elmt|
+    i = elmt.to_i
+    if (i < 0)
+      puts "Input numbers must be positive !!!"
+      exit 1
+    end
+    inputNumbers.push i
+  }
+end
 target = inputNumbers.pop
 
-algo = Le_Compte_Est_Bon::Algo.new(target)
-algo.run(inputNumbers)
+algo = Le_Compte_Est_Bon::Algo.new(inputNumbers,target,clientServerMode,uri)
+algo.run
 
