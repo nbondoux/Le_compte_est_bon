@@ -809,7 +809,7 @@ module Le_Compte_Est_Bon
 
       elsif (clientServerMode == :server_client_mode and pidFromFork.nil?) or clientServerMode == :client_mode
         leCompteEstBonClient = LeCompteEstBonClient.new
-        DRb.start_service("drbunix:/tmp/socket.lecompteestbon.#{rand(1000000)}",nil)
+        DRb.start_service
 
         isConnectionOk = false
         while not isConnectionOk
