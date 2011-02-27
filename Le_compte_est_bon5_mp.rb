@@ -834,11 +834,18 @@ module Le_Compte_Est_Bon
 
         while not theJob.nil?
           bestSolution.setJob(theJob)
-	  puts "titi: Dequeue a Job (#{theJob.iSubLSize}) (#{theJob.iNumCpu})"
+          #theJob is a reference to a distant DRbObject; lets retrieve
+          #its content once:
+          l = theJob.iL
+          subLSize = theJob.iSubLSize
+          numCpu = theJob.iNumCpu
+          cpuExp = theJob.iCpuExp
+
+	  puts "titi: Dequeue a Job (#{subLSize}) (#{numCpu})"
 
           begin
-            Le_Compte_Est_Bon.getSubCombinationsFixedLSize(theJob.iL,theJob.iSubLSize,theJob.iL.size) { |subL|
-              algo_l_size(subL,theJob.iNumCpu,theJob.iCpuExp,leCompteEstBonClient) {|elmt|
+            Le_Compte_Est_Bon.getSubCombinationsFixedLSize(l,subLSize,l.size) { |subL|
+              algo_l_size(subL,numCpu,cpuExp,leCompteEstBonClient) {|elmt|
                 if leCompteEstBonClient.cancelled?
                   raise LeCompteEstBonClientCancelledException
                 end
