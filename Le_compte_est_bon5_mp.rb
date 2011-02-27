@@ -4,6 +4,10 @@
 require 'getoptlong'
 require 'drb'
 
+#for mutexes:
+require 'thread'
+
+
 # NB Note: this is really ugly and dependant of DRb version, but it is needed to fix a bug
 def DRb::here?(iUri)
   (self.uri rescue nil) == iUri
@@ -143,7 +147,7 @@ module NB_Common
 
     def list
       aPrevious = @previous
-      while aPrevious.class != DoublyLinkedListElmtEnd
+      while not (aPrevious.class.eql? DoublyLinkedListElmtEnd)
         return nil if aPrevious.nil?
         aPrevious=aPrevious.previous
       end
@@ -449,13 +453,15 @@ module Le_Compte_Est_Bon
     end
 
     class BestSolution
-      attr_accessor :node, :target
+      attr_accessor :target
       
-      def initialize(iTarget, iJob)
-        @target = iTarget
-        @node = nil
+      def initialize
+      end
+
+      def setJob(iJob)
+        @target = iJob.serverObject.target
         @remoteJob = iJob
-        @delta = nil
+        @delta = iJob.serverObject.bestSolutionDescriptor.delta
       end
 
       def isSolutionFound
@@ -463,13 +469,10 @@ module Le_Compte_Est_Bon
       end
 
       def tryBestSolution(iNode)
-        if not @delta or 
+        if @delta.nil? or 
             (iNode.value - @target < @delta and @target - iNode.value < @delta)
-          @delta = @target - iNode.value
-          @delta = - @delta if @delta < 0
           bestSolutionDescriptor = @remoteJob.serverObject.bestSolutionDescriptor
-
-          @node=iNode.duplicateTree
+          puts "titi: Push local best so far: #{iNode.value} = #{iNode} ; current delta = #{@delta}"
           @remoteJob.serverObject.pushBestSolution(iNode,@remoteJob)
           @delta = bestSolutionDescriptor.delta
           # in order to have the right value before next poll; not mandatory
@@ -487,7 +490,6 @@ module Le_Compte_Est_Bon
     end
    
     def algo_l_size (iL, iNumCpu, iCpuExp, iClientInstance, &block)
-      return if iClientInstance.cancelled?
       if iL.next == NB_Common::SinglyLinkedList.emptyList
         # if l.size is one
         
@@ -502,22 +504,19 @@ module Le_Compte_Est_Bon
         # on top of the file
         
         Le_Compte_Est_Bon.getAllSubCombinationCouples(iL, iNumCpu, iCpuExp) {|l1,l2|
-          break if iClientInstance.cancelled?
           if not l1.empty? and not l2.empty?
             newNode = Node.new
 
             algo_l_size(l1, 0, 0, iClientInstance) {|elmt1|
-              break if iClientInstance.cancelled?
               algo_l_size(l2, 0, 0, iClientInstance) {|elmt2|
-                break if iClientInstance.cancelled?
                 newNode.leftNode = elmt1
                 newNode.rightNode = elmt2
                 val1 = elmt1.value
                 val2 = elmt2.value
                 
                 if val1 > 0 and val2 > 0
-                  if (elmt1.class != Node or elmt1.operation != :Minus) and
-                      (elmt2.class != Node or elmt2.operation != :Minus)
+                  if (not (elmt1.class.eql? Node) or elmt1.operation != :Minus) and
+                      (not (elmt2.class.eql? Node) or elmt2.operation != :Minus)
                     newNode.value=val1 + val2
                     newNode.operation = :Add
                     yield newNode
@@ -543,8 +542,8 @@ module Le_Compte_Est_Bon
                 end
                 
                 if val1 > 1 and val2 > 1
-                  if ((elmt1.class != Node or elmt1.operation != :Divi) and
-                      (elmt2.class != Node or elmt2.operation != :Divi))
+                  if ((not (elmt1.class.eql? Node) or elmt1.operation != :Divi) and
+                      (not (elmt2.class.eql? Node) or elmt2.operation != :Divi))
                     newNode.value=val1 * val2
                     newNode.operation = :Mult
                     yield newNode
@@ -609,6 +608,7 @@ module Le_Compte_Est_Bon
         @lastEnqueuedJobSize = 0
         @finishedJobs = NB_Common::DoublyLinkedList.new
         @bestSolutionDescriptor = BestSolutionDescriptor.new
+        @bigLock = Mutex.new
       end
       
       class JobListContainer < NB_Common::DoublyLinkedList
@@ -622,42 +622,42 @@ module Le_Compte_Est_Bon
 
       
       def enqueueJob(iJob)
-        if iJob.iSubLSize != @lastEnqueuedJobSize
-          @jobs.push(JobListContainer.new)
-        end
-        @lastEnqueuedJobSize = iJob.iSubLSize
-        @jobs.back.push(iJob)
+        @bigLock.synchronize {
+          if iJob.iSubLSize != @lastEnqueuedJobSize
+            @jobs.push(JobListContainer.new)
+          end
+          @lastEnqueuedJobSize = iJob.iSubLSize
+          @jobs.back.push(iJob)
+        }
       end
-
+      
       def dequeueJob(iClient)
-        if @jobs.empty?
-          DRb.stop_service
-          return nil
-        else
-          jobsForCurrentSize = @jobs.front
-
-          if jobsForCurrentSize.empty?
-            jobsForCurrentSize =jobsForCurrentSize.next
-            jobsForCurrentSize.rmElmtBefore
-          end
-          if jobsForCurrentSize.class != NB_Common::DoublyLinkedListElmtEnd
-            job = jobsForCurrentSize.pop_front
-            job.remoteClients.push(iClient)
-            jobsForCurrentSize.push job
-            begin
-              iClient.cancelled = false             
-              return job
-            rescue
-              return nil
+        @bigLock.synchronize {
+          if not @jobs.empty?
+            jobsForCurrentSize = @jobs.front
+            
+            if jobsForCurrentSize.empty?
+              jobsForCurrentSize = jobsForCurrentSize.next
+              jobsForCurrentSize.rmElmtBefore
             end
-          else
-            DRb.stop_service
-            return nil
+            if not jobsForCurrentSize.class.eql? NB_Common::DoublyLinkedListElmtEnd
+              job = jobsForCurrentSize.pop_front
+              job.remoteClients.push(iClient)
+              jobsForCurrentSize.push job
+              begin
+                iClient.cancelled = false
+                return job
+              rescue
+                return nil
+              end
+            end
           end
-        end
+        }
+        DRb.stop_service
+        return nil
       end
 
-      def jobGaveASolution(iJob)
+      def jobGaveASolution_nolock(iJob)
         jobListForCurrentSize = iJob.list
         
         #let's cancel all jobs being currently treated for the same size
@@ -671,11 +671,11 @@ module Le_Compte_Est_Bon
             end
           }
           @finishedJobs.push aJob
-        }
-
+        }        
         #let's remove all job lists for bigger sizes
         jobListForNextSize = jobListForCurrentSize.next
-        while jobListForNextSize.class != NB_Common::DoublyLinkedListElmtEnd
+        while not jobListForNextSize.class.eql? NB_Common::DoublyLinkedListElmtEnd
+          puts "titi #{jobListForNextSize.class}"
           jobListForNextSize.rmElmt
           jobListForNextSize = jobListForCurrentSize.next
         end
@@ -684,44 +684,48 @@ module Le_Compte_Est_Bon
       # to be called by any client process at the end of process of a job,
       # to unregister the process, and cancell any other process working on the job
       def finishJob(iClient,iJob)
-        iJob.remoteClients.delete(iClient)
-        if iJob.remoteClients.empty?
-          #this job shouldn't be referenced anyx where; it can be garbage collected
-          iJob.rmElmt
-        else
-          if not iJob.cancelled
-            iJob.cancelled = true
-            iJob.remoteClients.each {|client|
-              begin
-                client.cancelled = true
-              rescue
-                #puts "client #{iClient.__drburi} lost ..."
-                #we lost the client ...
-              end
-            }
-          end  
-          #detach the job from current list and push it in the to be deleted jobs
-          @finishedJobs.push iJob
-        end
+        @bigLock.synchronize {
+          iJob.remoteClients.delete(iClient)
+          if iJob.remoteClients.empty?
+            #this job shouldn't be referenced anyx where; it can be garbage collected
+            iJob.rmElmt
+          else
+            if not iJob.cancelled
+              iJob.cancelled = true
+              iJob.remoteClients.each {|client|
+                begin
+                  client.cancelled = true
+                rescue
+                  #puts "client #{iClient.__drburi} lost ..."
+                  #we lost the client ...
+                end
+              }
+            end
+            #detach the job from current list and push it in the to be deleted jobs
+            @finishedJobs.push iJob
+          end
+        }
       end
 
       def pushBestSolution(iNode, iJob)
-        value = iNode.value
-        delta = value - target
-        delta = - delta if delta < 0
-        solutionSize = iNode.numberOfFinalNodes
-        if @delta.nil? or delta < @delta
-          @bestNode = iNode
-          @delta = delta
-          @bestSolutionDescriptor.delta = delta
-          puts "Best so far: #{@bestNode.value} = #{@bestNode}"
-          if delta == 0
-            jobGaveASolution(iJob)
+        @bigLock.synchronize {
+          value = iNode.value
+          delta = value - target
+          delta = - delta if delta < 0
+          solutionSize = iNode.numberOfFinalNodes
+          if @delta.nil? or delta < @delta
+            @bestNode = iNode
+            @delta = delta
+            @bestSolutionDescriptor.delta = delta
+            puts "Best so far: #{@bestNode.value} = #{@bestNode}"
+            if delta == 0
+              jobGaveASolution_nolock(iJob)
+            end
           end
-        end
+        }
       end
     end
-
+    
     class LeCompteEstBonClient
       include DRb::DRbUndumped
       attr_accessor :bestSolutionDescriptor,:cancelled
@@ -742,7 +746,7 @@ module Le_Compte_Est_Bon
       
       #gets all combinations of size n verifying iMinLength <= n <= iLSize
 
-      maxCpuExp = 5
+      maxCpuExp = 6
 
       sl_size = 1
 
@@ -765,6 +769,9 @@ module Le_Compte_Est_Bon
 
     private :algo_l_size, :algo_all_sizes
     
+    class LeCompteEstBonClientCancelledException < Exception
+    end
+
     def run()
       srand
       
@@ -822,20 +829,25 @@ module Le_Compte_Est_Bon
           end
         end
               
-        currentJobSize = 0
-                
+        bestSolution = BestSolution.new
         theJob = leCompteEstBonServer.dequeueJob(leCompteEstBonClient)
 
         while not theJob.nil?
-          bestSolution = BestSolution.new(theJob.serverObject.target,theJob)
-          currentJobSize = theJob.iSubLSize
+          bestSolution.setJob(theJob)
+	  puts "titi: Dequeue a Job (#{theJob.iSubLSize}) (#{theJob.iNumCpu})"
 
-          Le_Compte_Est_Bon.getSubCombinationsFixedLSize(theJob.iL,theJob.iSubLSize,theJob.iL.size) { |subL|
-            break if leCompteEstBonClient.cancelled?
-            algo_l_size(subL,theJob.iNumCpu,theJob.iCpuExp,leCompteEstBonClient) {|elmt|
-              bestSolution.tryBestSolution(elmt)
+          begin
+            Le_Compte_Est_Bon.getSubCombinationsFixedLSize(theJob.iL,theJob.iSubLSize,theJob.iL.size) { |subL|
+              algo_l_size(subL,theJob.iNumCpu,theJob.iCpuExp,leCompteEstBonClient) {|elmt|
+                if leCompteEstBonClient.cancelled?
+                  raise LeCompteEstBonClientCancelledException
+                end
+                bestSolution.tryBestSolution(elmt)
+              }
             }
-          }
+          rescue LeCompteEstBonClientCancelledException
+            puts "titi: Job cancelled"
+          end
           leCompteEstBonServer.finishJob(leCompteEstBonClient,theJob)
           theJob = leCompteEstBonServer.dequeueJob(leCompteEstBonClient)
         end
@@ -845,7 +857,7 @@ module Le_Compte_Est_Bon
       
       if leCompteEstBonServer.delta == 0
         puts "#{@target} = #{leCompteEstBonServer.bestNode}"
-      elsif leCompteEstBonServer.bestSolution
+      elsif leCompteEstBonServer.bestNode
         puts "No Solution; nearest solution is: #{leCompteEstBonServer.bestNode.value} = #{leCompteEstBonServer.bestNode}"
       else
         puts "No Solution"
