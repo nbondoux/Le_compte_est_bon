@@ -675,7 +675,6 @@ module Le_Compte_Est_Bon
         #let's remove all job lists for bigger sizes
         jobListForNextSize = jobListForCurrentSize.next
         while not jobListForNextSize.class.eql? NB_Common::DoublyLinkedListElmtEnd
-          puts "titi #{jobListForNextSize.class}"
           jobListForNextSize.rmElmt
           jobListForNextSize = jobListForCurrentSize.next
         end
