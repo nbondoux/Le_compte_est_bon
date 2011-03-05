@@ -773,11 +773,10 @@ module Le_Compte_Est_Bon
 
     def run()
       srand
-      
+
       if clientServerMode == :server_client_mode
         @uri ||= "drbunix:/tmp/socket.lecompteestbon.serv.#{rand(1000000)}"
       end
-      
 
       pidFromFork = nil
       childPids = nil
@@ -815,7 +814,13 @@ module Le_Compte_Est_Bon
 
       elsif (clientServerMode == :server_client_mode and pidFromFork.nil?) or clientServerMode == :client_mode
         leCompteEstBonClient = LeCompteEstBonClient.new
-        DRb.start_service
+
+        uriClient = nil
+        if clientServerMode == :server_client_mode
+          uriClient = "drbunix:/tmp/socket.lecompteestbon.serv.#{rand(1000000)}"
+        end
+
+        DRb.start_service(uriClient,nil)
 
         isConnectionOk = false
         while not isConnectionOk
