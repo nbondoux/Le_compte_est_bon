@@ -339,7 +339,7 @@ module Le_Compte_Est_Bon
         duplicateL = NB_Common::SinglyLinkedList.new
         duplicateL.content = nextL.content
         nextL = nextL.next
-        if iNumCpu & 1 == 1
+        if iNumCpu & 1 == 0
           duplicateL.next = head
           head = duplicateL
         else
@@ -605,7 +605,6 @@ module Le_Compte_Est_Bon
         @delta = nil
         @target = iTarget
         @jobs = NB_Common::DoublyLinkedList.new
-        @lastEnqueuedJobSize = 0
         @finishedJobs = NB_Common::DoublyLinkedList.new
         @bestSolutionDescriptor = BestSolutionDescriptor.new
         @bigLock = Mutex.new
@@ -621,13 +620,46 @@ module Le_Compte_Est_Bon
       end
 
       
-      def enqueueJob(iJob)
-        @bigLock.synchronize {
-          if iJob.iSubLSize != @lastEnqueuedJobSize
-            @jobs.push(JobListContainer.new)
+      def enqueueJobs(iJobs)
+        # the goal here is to put in front line
+        # the longest jobs, following an heuristic;
+        # the idea is that if the iCpuExp in binary contains
+        # a big difference in number of 1 and 0, the job will be longer
+        # (the generated lists will be less equilibrated: see 
+        # Le_Compte_Est_Bon.getAllSubCombinationCouples)
+
+        sortedJobs=Array.new
+        iJobs.each {|job|
+          #compute the heuristic weith of the job
+          mask = job.iNumCpu
+          maskLength = job.iCpuExp
+          weightZero = 0
+          weightOne = 0
+          
+          while weightOne + weightZero < maskLength
+            if (mask & 1) == 1
+              weightOne += (mask & 1)
+            else
+              weightZero += 1
+            end
+            mask = mask >> 1
           end
-          @lastEnqueuedJobSize = iJob.iSubLSize
-          @jobs.back.push(iJob)
+
+          if weightOne > weightZero + 1 #+1 because the first élément of iL always count as a 0 (see Le_Compte_Est_Bon.getAllSubCombinationCouples)
+            weight = weightOne
+          else
+            weight = weightZero + 1
+          end
+          sortedJobs.push([job,weight])
+        }
+        sortedJobs.sort!{|a,b|
+          #sort by inverse weight (do the longest jobs in first)
+          b[1] <=> a[1]
+        }
+       
+        @jobs.push(JobListContainer.new)
+        sortedJobs.each{|job,weight|
+          @jobs.back.push(job)
         }
       end
       
@@ -750,6 +782,7 @@ module Le_Compte_Est_Bon
       sl_size = 1
 
       while sl_size <= iLSize
+        jobs = Array.new
         cpuExp = maxCpuExp
         if cpuExp + 1 >= sl_size
           cpuExp = sl_size - 1
@@ -758,9 +791,10 @@ module Le_Compte_Est_Bon
 
         numCpu = 0
         while numCpu < maxNumCpu
-          iLeCompteEstBonServer.enqueueJob(AJob_algo_l_size.new(iLeCompteEstBonServer,iL,sl_size,numCpu,cpuExp))
+          jobs.push(AJob_algo_l_size.new(iLeCompteEstBonServer,iL,sl_size,numCpu,cpuExp))
           numCpu +=1
         end
+        iLeCompteEstBonServer.enqueueJobs(jobs)
         sl_size +=1
       end
 
