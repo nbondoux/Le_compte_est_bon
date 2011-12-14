@@ -13,6 +13,29 @@ def DRb::here?(iUri)
   (self.uri rescue nil) == iUri
 end
 
+=begin
+#Hack to have it run in ipv6!
+TheIP = "2a01:e35:2f75:8810:1a3d:a2ff:fe47:5800"
+
+module DRb
+
+
+  class DRbTCPSocket
+
+    def self.open_server(uri, config)
+      host = TheIP
+      port = 0
+      soc = TCPServer.open(TheIP, port)
+      
+      port = soc.addr[1] if port == 0
+      config[:tcp_port] = port
+      uri = "druby://#{host}:#{port}"
+      self.new(uri, soc, config)
+    end
+  end
+end
+=end
+
 module NB_Common
 
   #note: a SinglyLinkedList is also the first element of the (sub) list
@@ -718,7 +741,7 @@ module Le_Compte_Est_Bon
         @bigLock.synchronize {
           iJob.remoteClients.delete(iClient)
           if iJob.remoteClients.empty?
-            #this job shouldn't be referenced anyx where; it can be garbage collected
+            #this job shouldn't be referenced any where; it can be garbage collected
             iJob.rmElmt
           else
             if not iJob.cancelled
@@ -816,7 +839,7 @@ module Le_Compte_Est_Bon
       childPids = nil
       if clientServerMode == :server_client_mode
         # create the child processes !!!!
-        nbProcesses = 2
+        nbProcesses = 4 
         childPids = Array.new
         i=0
         while i < nbProcesses
