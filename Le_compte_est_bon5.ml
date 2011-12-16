@@ -261,7 +261,7 @@ let rec algo_l_size iL iLSize future =
                               nextToUpper()
                           in
                           let nextop3 () =
-                            if (*val1 > 1 && val2 >1 &&*)
+                            if val1 > 1 && val2 >1 &&
                               not (node_is_op elmt1 Divi) &&
                               not (node_is_op elmt2 Divi) then
                               LazyList (
@@ -272,17 +272,17 @@ let rec algo_l_size iL iLSize future =
 
                           in
                           let nextop2 () =
-                            if (val2 > val1) (*&& val1 > 0*) then
+                            if (val2 > val1) && val1 > 0 then
                               LazyList (Node (val2 - val1, elmt2, elmt1, Minus)
                                           , fun () -> nextop3())
-                            else if (val1 >= val2) (*&& val2 > 0*) then
+                            else if (val1 >= val2) && val2 > 0 then
                               LazyList (Node (val1 - val2, elmt2, elmt1, Minus)
                                           , fun () -> nextop3())
                             else
                               nextop3()
                           in
                           let nextop1 () =
-                            if (*val1 > 0 && val2 >0 && *)
+                            if val1 > 0 && val2 >0 &&
                               not (node_is_op elmt1 Minus) &&
                               not (node_is_op elmt2 Minus) then
                               LazyList (

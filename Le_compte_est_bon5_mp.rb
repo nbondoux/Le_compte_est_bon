@@ -546,7 +546,7 @@ module Le_Compte_Est_Bon
                   end
                 end
                 
-                if val2 > val1
+                if val2 > val1 && val1 > 0
                   newNode.value=val2 - val1
                   
                   newNode.leftNode = elmt2
@@ -558,13 +558,13 @@ module Le_Compte_Est_Bon
                     newNode.rightNode = elmt2
                 end
                 
-                if val1 >= val2
+                if val1 >= val2 && val2 > 0
                   newNode.value=val1 - val2
                   newNode.operation = :Minus
                   yield newNode
                 end
                 
-                if val1 > 1 and val2 > 1
+                if val1 > 1 && val2 > 1
                   if ((not (elmt1.class.eql? Node) or elmt1.operation != :Divi) and
                       (not (elmt2.class.eql? Node) or elmt2.operation != :Divi))
                     newNode.value=val1 * val2
