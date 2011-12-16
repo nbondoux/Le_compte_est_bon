@@ -191,11 +191,11 @@ let rec tree_to_s t =
         )
       |Number i -> string_of_int i;;
 
-
-
+(*
+  (* style with lift and map; easier to write, but much slower (because map and lift resolution takes function calls*)
 let rec algo_l_size iL iLSize =
   match iL with
-      [a] -> LazyList (Number a,fun () -> LazyListEnd)
+      [a] -> LazyList (a,fun () -> LazyListEnd)
     | [] -> LazyListEnd
     | l -> lazyListLift (lazyListMap (getAllSubCombinationCouples l (List.length l)) (fun (l1,l2) ->
       
@@ -214,6 +214,44 @@ let rec algo_l_size iL iLSize =
       )
     )
     );;
+*)
+
+let rec algo_l_size iL iLSize =
+  match iL with
+      [a] -> LazyList (a,fun () -> LazyListEnd)
+    | [] -> LazyListEnd
+    | _ -> (
+      let rec f_listCouples iListCoupleList =
+      match iListCoupleList with
+        |LazyList ((l1,l2),nextCouple) -> (
+          let l1_size = List.length l1 in
+          let l2_size = List.length l2 in
+          let rec f_subcombs1 iListCombs1 =
+              match iListCombs1 with
+                |LazyList (elmt1,nextComb1) -> (
+                  let val1 = value_node elmt1 in
+                  let rec f_subcombs2 iListCombs2 =
+                      match iListCombs2 with
+                        |LazyList (elmt2,nextComb2) -> (
+                          let val2 = value_node elmt2 in
+                          LazyList (Node (val1 + val2, elmt1, elmt2, Add),fun () -> f_subcombs2 (nextComb2()))
+                        )
+                        |LazyListEnd -> f_subcombs1 (nextComb1 ())
+                  in
+                  f_subcombs2 (algo_l_size l2 l2_size)
+                )
+                |LazyListEnd -> f_listCouples (nextCouple())
+          in
+          f_subcombs1 (algo_l_size l1 l1_size)
+        )
+        |LazyListEnd -> LazyListEnd 
+      in f_listCouples (getAllSubCombinationCouples iL (List.length iL))
+    )
+;;
+
+
+
+
 
         (* Let's yield all combination of elements of l1 X l2
            it is generate "the values made of combinations by an operation
