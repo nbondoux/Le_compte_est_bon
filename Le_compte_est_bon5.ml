@@ -1,16 +1,5 @@
 type 'a lazyList = LazyListEnd | LazyList of 'a * (unit -> ('a lazyList));;
 
-let rec lazyListMap tree f = match tree with
-    LazyList (res,next) -> LazyList (f res ,fun () ->  lazyListMap (next ()) f)
-  | LazyListEnd -> LazyListEnd
-;;
-
-
-let rec lazyListMerge map1 nmap2 =
-    match map1 with
-        LazyList (res, next) -> LazyList (res, fun () -> lazyListMerge (next()) nmap2)
-      |LazyListEnd -> (nmap2());;
-
 (* simple exemple of generator with CSP
 let rec fac x future =
   if x > 1 then
@@ -22,7 +11,55 @@ let fac2 x = fac x (fun _ -> LazyListEnd);;
 *)
 
 
-(* call the block for all possible l1 where
+let rec lazyListMap tree f = match tree with
+    LazyList (res,next) -> LazyList (f res ,fun () ->  lazyListMap (next ()) f)
+  | LazyListEnd -> LazyListEnd
+;;
+
+
+
+let rec lazyListMerge map1 nmap2 =
+    match map1 with
+        LazyList (res, next) -> LazyList (res, fun () -> lazyListMerge (next()) nmap2)
+      |LazyListEnd -> (nmap2());;
+
+let rec lazyListFoldLeft a lst f=
+  match lst with
+    LazyList (res,next) -> lazyListFoldLeft (f a res) (next()) f
+    |LazyListEnd -> a;;
+
+(* (unit -> 'a lazyList) lazyList -> 'a lazyList = <fun>  *)
+
+
+let rec lazyListLift lst =
+  match lst with
+      LazyListEnd -> LazyListEnd
+    | LazyList (l,next) -> 
+      match l() with 
+          LazyList (l2,next2) -> LazyList (l2, fun () -> lazyListLift (LazyList (next2, next)))
+        | LazyListEnd -> lazyListLift (next());;
+
+ 
+(* 
+this method is built on this model:
+let rec myLift lst = 
+  match lst with
+      [] -> []
+    |l::next -> ( 
+      match l with
+          l2::next2 -> l2::(myLift (next2::next))   
+        |[] -> myLift next
+    );;
+
+
+example for lazyListLift
+ let a = LazyList ((fun () -> fac2 4), fun () -> (LazyList ((fun () -> (fac2 5)),fun () -> LazyListEnd)));;
+   let LazyList (a,b) = lazyListLift a;;
+   let LazyList (a,b) = b();;
+ *)
+
+
+(* return a lazyList holding all possible l1 where
    l1 is made of iL1Size elements of iL
 *)
 
@@ -42,7 +79,7 @@ let rec getSubCombinationsFixedLSize iL iL1Size iLSize =
 ;;
   
 
-(*  call the block for all possible l1 where l1 is made n elements of iL,
+(*  return a lazyList holding all possible l1 where l1 is made n elements of iL,
     iMinSize <= n < iMaxSize
     l1 are returned by growing order of n
 *)
@@ -59,141 +96,214 @@ let rec getSubCombinations iL iLSize iMinSize iMaxSize =
 
 
 
-  # call the block for all possible couple (l1,l2) where
-  # l1 is made of iL1Size elements of iL and l2 contains the complementary elmts
-  # of iL
+ (* return a lazyList holding all possible couple (l1,l2) where
+    l1 is made of iL1Size elements of iL and l2 contains the complementary elmts
+    of iL
+ *)
 
-  def Le_Compte_Est_Bon.getSubCombinationCouplesFixedL1Size(iL,iL1Size, iLSize)
-    if iL1Size == 0
-      yield SinglyLinkedList.emptyList,iL
+let rec getSubCombinationCouplesFixedL1Size iL iL1Size iLSize =
+    if iL1Size == 0 then
+      LazyList (([],iL),fun () -> LazyListEnd)
     else
-      duplicate_head = SinglyLinkedList.new
-      duplicate_head.content = iL.content
+      match iL with 
+          h::t -> (
+            let hInFirsts = lazyListMap (getSubCombinationCouplesFixedL1Size t (iL1Size - 1) (iLSize -1 )) (fun (l1,l2) -> (h::l1,l2)) in
+            if iL1Size < iLSize then
+              let hInSeconds = fun () -> lazyListMap (getSubCombinationCouplesFixedL1Size t (iL1Size) (iLSize - 1)) (fun (l1,l2) -> (l1, h::l2)) in
+              lazyListMerge hInFirsts hInSeconds 
+            else
+              hInFirsts
+          )
+        | [] -> LazyListEnd;;
+
+
+(* return all non_ordered subcombinations of iL where iL1 has size
+   iL1Size; it differs from getSubCombinationCouplesFixedL1Size, as
+   if iL1Size*2 == iLSize, we must not return (['a'],['b'])  and (['b'],['a'])
+*)
+let rec getSubCombinationCouplesFixedL1Size_bis iL iL1Size iLSize =
+    if iL1Size * 2 != iLSize then
+      getSubCombinationCouplesFixedL1Size iL iL1Size iLSize 
+    else
+      match iL with 
+          h::t -> lazyListMap (getSubCombinationCouplesFixedL1Size t (iL1Size-1) (iLSize-1))
+                     (fun (l1,l2) -> (h::l1,l2))
+        |[] -> LazyList(([],[]),fun() -> LazyListEnd);;
+
+(* returns all non-ordered couple of sub combinations of l!!! *)
+let getAllSubCombinationCouples iL iLSize = 
+  let rec f i =
+    if i *2 <= iLSize then
+      lazyListMerge (getSubCombinationCouplesFixedL1Size_bis iL i iLSize)
+        (fun () ->f (i+1))
+    else
+      LazyListEnd in
+  f 0;;
+
+
+
+type operation = Add|Minus|Mult|Divi;;
+type tree = Number of int | Node of (int * tree * tree* operation);;
+
+type solution = BestTree of (tree * int) | SolNull;;
+
+let op_priority_op op =
+  match op with
+      Add|Minus -> 1
+    |Mult|Divi -> 2
+;;
+
+let op_priority_node node =
+  match node with
+      Node (_,_,_,op) -> op_priority_op op
+    | Number _ -> 100;;
+
+let value_node node = 
+  match node with
+      Node (v,_,_,_) -> v
+    | Number v -> v;;
+
+let is_operation_associative op =
+  match op with
+      Add|Mult -> true
+    |Minus|Divi -> false;;
+
+let rec tree_to_s t =
+    match t with
+        Node (_,nl,nr,op) -> (
+          let strLeft = tree_to_s nl in
+          let strRight = tree_to_s nr in
+          let strLeft = (if op_priority_node nl < op_priority_op op then
+              "("^strLeft^")"
+            else
+              strLeft) in
+          let strRight = (if ((not (is_operation_associative op) ) &&
+                                 op_priority_node nr <= op_priority_op op) ||
+              op_priority_node nr < op_priority_op op then
+              "("^strRight^")"
+            else
+              strRight) in
+          match op with
+              Add -> strLeft^"+"^strRight
+            |Minus -> strLeft^"-"^strRight
+            |Mult -> strLeft^"*"^strRight
+            |Divi -> strLeft^"/"^strRight
+        )
+      |Number i -> string_of_int i;;
+
+
+
+let rec algo_l_size iL iLSize =
+  match iL with
+      [a] -> LazyList (Number a,fun () -> LazyListEnd)
+    | [] -> LazyListEnd
+    | l -> lazyListLift (lazyListMap (getAllSubCombinationCouples l (List.length l)) (fun (l1,l2) ->
       
-      #all combinations that contain head of list
-      getSubCombinationCouplesFixedL1Size(iL.next,iL1Size-1,iLSize-1) {|sl1,sl2|
-        duplicate_head.next = sl1
-        yield duplicate_head,sl2
-      }
-      #all combinations that do not contain head of list
-      if (iL1Size < iLSize)
-        getSubCombinationCouplesFixedL1Size(iL.next,iL1Size,iLSize-1) {|sl1,sl2|
-          duplicate_head.next = sl2
-          yield sl1,duplicate_head
+      let l1_size = List.length l1 in
+      let l2_size = List.length l2 in
+      
+      fun () -> lazyListLift (
+        lazyListMap (algo_l_size l1 l1_size) (fun elmt1 ->
+          let val1 = value_node elmt1 in
+          fun () -> lazyListMap (algo_l_size l2 l2_size) (fun elmt2 ->
+            let val2 = value_node elmt2 in
+            Node (val1 + val2, elmt1, elmt2, Add)
+              
+          )
+        )
+      )
+    )
+    );;
+
+        (* Let's yield all combination of elements of l1 X l2
+           it is generate "the values made of combinations by an operation
+           of the values generated by the couple of lists whose combined
+           total number of elements is L" part of the algorithm described
+           on top of the file *)
+        
+        Le_Compte_Est_Bon.getAllSubCombinationCouples(iL,iLSize) {|l1,l2|
+          break if @bestSolution.isSolutionFound
+          if not l1.empty
+            l1_size = l1.size
+            l2_size = l2.size
+            
+            newNode = Node.new
+
+            algo_l_size(l1, l1_size) {|elmt1|
+              break if @bestSolution.isSolutionFound
+
+              algo_l_size(l2, l2_size) {|elmt2|
+                break if @bestSolution.isSolutionFound
+
+                newNode.leftNode = elmt1
+                newNode.rightNode = elmt2
+                val1 = elmt1.value
+                val2 = elmt2.value
+                
+                if val1 > 0 and val2 > 0
+                  if (elmt1.class != Node or elmt1.operation != :Minus) and
+                      (elmt2.class != Node or elmt2.operation != :Minus)
+                    newNode.value=val1 + val2
+                    newNode.operation = :Add
+                    yield newNode
+                  end
+                end
+                
+                if val2 > val1
+                  newNode.value=val2 - val1
+                  
+                  newNode.leftNode = elmt2
+                  newNode.rightNode = elmt1
+                  newNode.operation = :Minus
+                  
+                  yield newNode
+                  newNode.leftNode = elmt1
+                    newNode.rightNode = elmt2
+                end
+                
+                if val1 >= val2
+                  newNode.value=val1 - val2
+                  newNode.operation = :Minus
+                  yield newNode
+                end
+                
+                if val1 > 1 and val2 > 1
+                  if ((elmt1.class != Node or elmt1.operation != :Divi) and
+                      (elmt2.class != Node or elmt2.operation != :Divi))
+                    newNode.value=val1 * val2
+                    newNode.operation = :Mult
+                    yield newNode
+                  end
+                end
+                
+                if(val2 > val1 and val1 > 1 and (val2 % val1) == 0)
+                  newNode.value=val2 / val1
+                  newNode.leftNode = elmt2
+                  newNode.rightNode = elmt1
+                  newNode.operation = :Divi
+                  
+                  yield newNode
+                  newNode.leftNode = elmt1
+                  newNode.rightNode = elmt2
+                end
+                
+                
+                if( val1 >= val2 and val2 > 1 and (val1 % val2) == 0)
+                  newNode.value=val1 / val2
+                  newNode.operation = :Divi
+                  
+                  yield newNode
+                end
+              }
+            }      
+          end
         }
-      end
-    end
-  end
-
-  # return all non_ordered subcombinations of iL where iL1 has size
-  # iL1Size; it differs from getSubCombinationCouplesFixedL1Size, as
-  # if iL1Size*2 == iLSize, we must not return (['a'],['b'])  and (['b','a'])
-  
-
-  def Le_Compte_Est_Bon.getSubCombinationCouplesFixedL1Size_bis(iL,iL1Size, iLSize,&block)
-    if iL1Size * 2 != iLSize
-      getSubCombinationCouplesFixedL1Size(iL,iL1Size,iLSize,&block)
-    else
-      # pop the first element of iL
-      duplicate_head = SinglyLinkedList.new
-      duplicate_head.content = iL.content
-      # and get all the combinations where iL1 contains this element
-      getSubCombinationCouplesFixedL1Size(iL.next,iL1Size-1,iLSize-1) {|sl1,sl2|
-        duplicate_head.next = sl1
-        block.call(duplicate_head,sl2)
-      }       
-    end
-  end
-
-  #returns all non-ordered couple of sub combinations of l!!!
-  def Le_Compte_Est_Bon.getAllSubCombinationCouples(iL,iLSize,&block)
-    i = 0;
-    while i*2 <= iLSize
-      getSubCombinationCouplesFixedL1Size_bis(iL,i,iLSize,&block)
-      i=i+1
-    end
-  end
-
-
-  class Node
-    attr_reader :leftNode, :rightNode, :operation, :value
-    attr_writer :leftNode, :rightNode, :operation, :value
-    
-    def duplicateTree
-      a = clone
-      a.leftNode =@leftNode.duplicateTree
-      a.rightNode =@rightNode.duplicateTree
-      return a
-    end
-
-    def operationPriority
-     if operation == :Add or operation == :Minus
-        return 1
-      elsif operation == :Mult or operation == :Divi
-       return 2
-     else
-       return 0
-     end
-    end
-
-    def isOperationAssociative
-     if operation == :Add or operation == :Mult
-        return true
-      elsif operation == :Minus or operation == :Divi
-       return false
-     else
-       return 0
-     end
+      end 
     end
 
 
-    def to_s
-      strLeft = @leftNode.to_s
-      strRight = @rightNode.to_s
-      
-      if @leftNode.operationPriority < operationPriority
-        strLeft = "(#{strLeft})"
-      end
 
-      if ((not isOperationAssociative) and @rightNode.operationPriority <= operationPriority) or
-          @rightNode.operationPriority < operationPriority
-        strRight = "(#{strRight})"
-      end
 
-      if(@operation == :Add)
-        return "#{strLeft}+#{strRight}"
-      elsif(@operation == :Minus)
-        return "#{strLeft}-#{strRight}"
-      elsif(@operation == :Mult)
-        return "#{strLeft}*#{strRight}"
-      elsif(@operation == :Divi)
-        return "#{strLeft}/#{strRight}"
-      end
-    end
-  end
-
-  class FinalNode
-    attr_reader :value
-    def initialize(iValue)
-      @value = iValue
-    end
-
-    def operationPriority
-      return 100
-    end
-    
-    def isOperationAssociative
-      false
-    end
-    
-    def duplicateTree
-      clone
-    end
-
-    def to_s
-      "#{@value}"
-    end
-  end
 
   class Algo
     
