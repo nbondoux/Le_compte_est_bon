@@ -87,7 +87,7 @@ algo l prof best_res cible iException=
      case find (\x -> valeur_Noeud x == cible) l of
        Just sol ->
            let profa = profondeur_arbre sol in
-           Cont$ \k -> (sol,profa):(runCont (iException (Just (sol,profa))) k)
+           cont$ \k -> (sol,profa):(runCont (iException (Just (sol,profa))) k)
        Nothing ->
            let algo2_next = algo2 l (prof+1) best_res cible iException in
            case best_res of
