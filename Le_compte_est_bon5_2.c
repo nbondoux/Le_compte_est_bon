@@ -778,9 +778,8 @@ short lcebFixedSizeGenerator(LcebFixedSizeGeneratorCtx_t* ioCoroCtx) {
             ioCoroCtx -> newNode.u.Node.ag = ioCoroCtx -> elmt1;
             ioCoroCtx -> newNode.u.Node.ad = ioCoroCtx -> elmt2;
           }
-                
-          if (ioCoroCtx -> val1 >= ioCoroCtx -> val2 && ioCoroCtx -> val2 > 0) {
-            ioCoroCtx -> newNode.value=ioCoroCtx -> val1 - ioCoroCtx -> val2;
+          else if (ioCoroCtx -> val1 >= ioCoroCtx -> val2 && ioCoroCtx -> val2 > 0) {
+              ioCoroCtx -> newNode.value=ioCoroCtx -> val1 - ioCoroCtx -> val2;
             
             ioCoroCtx -> newNode.u.Node.op = Minus;
             crReturn(1);
