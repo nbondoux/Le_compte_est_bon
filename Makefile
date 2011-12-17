@@ -27,7 +27,7 @@ Le\ compte\ est\ bon4_4:Le\ compte\ est\ bon4_4.ml
 	ocamlopt Le\ compte\ est\ bon4_4.ml -o Le\ compte\ est\ bon4_4
 
 Le_compte_est_bon5_ml:Le_compte_est_bon5.ml
-	ocamlopt Le_compte_est_bon5.ml -o ./Le_compte_est_bon5
+	ocamlopt Le_compte_est_bon5.ml -o ./Le_compte_est_bon5_ml
 
 Le\ compte\ est\ bon4_4_c:Le\ compte\ est\ bon4_4.c
 	gcc -O3 -march=native -Wall -o  Le\ compte\ est\ bon4_4_c  Le\ compte\ est\ bon4_4.c
