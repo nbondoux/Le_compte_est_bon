@@ -11,7 +11,7 @@ let fac2 x = fac x (fun _ -> CompListEnd);;
 *)
 
 
-let rec compListMap tree f = match tree with
+let rec compListMap lst f = match lst with
     CompList (res,next) -> CompList (f res ,fun () ->  compListMap (next ()) f)
   | CompListEnd -> CompListEnd
 ;;
@@ -148,8 +148,6 @@ let getAllSubCombinationCouples iL iLSize =
 
 type operation = Add|Minus|Mult|Divi;;
 type tree = Number of int | Node of (int * tree * tree* operation);;
-
-type solution = BestTree of tree | SolNull;;
 
 let op_priority_op op =
   match op with
