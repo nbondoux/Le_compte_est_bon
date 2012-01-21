@@ -334,9 +334,9 @@ le_compte_est_bon iL iTarget =
     res <- rec_algo computations Nothing
     (let line =
            case res of
-             (Nothing,Nothing) -> "No Solution"
+             (Nothing,Nothing) -> "No Solution\n"
              (Nothing,Just (best,_)) -> "No Solution; nearest solution is: "++( show (value_node best))++" = "++(show best)++"\n"
-             (Just n,_) -> (show (value_node n))++" = "++(show n)
+             (Just n,_) -> (show (value_node n))++" = "++(show n)++"\n"
      in
       putStr line
       )
