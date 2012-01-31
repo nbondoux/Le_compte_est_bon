@@ -224,7 +224,7 @@ let rec algo_l_size iL iLSize =
 
 let rec algo_l_size iL iLSize future =
   match iL with
-      [a] -> CompList (a,fun () -> future())
+      [a] -> CompList (a,future)
     | [] -> future()
     | _ -> (
       let rec f_listCouples iListCoupleList =
