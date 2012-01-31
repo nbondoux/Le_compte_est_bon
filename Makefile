@@ -1,4 +1,4 @@
-all2: Le\ compte\ est\ bon Le\ compte\ est\ bon2 Le\ compte\ est\ bon2_2 Le\ compte\ est\ bon3_byte Le\ compte\ est\ bon4 Le\ compte\ est\ bon4_2 Le\ compte\ est\ bon4_3 Le\ compte\ est\ bon4_4 Le\ compte\ est\ bon4_4_c Le\ compte\ est\ bon4_4_c_rapide Le\ compte\ est\ bon4_4_hs Le\ compte\ est\ bon2_2_hs Le\ compte\ est\ bon2_2_2_hs Le\ compte\ est\ bon4_4_hsIO Le\ compte\ est\ bon4_4_2_hs Le\ compte\ est\ bon4_4_3_hs Le\ compte\ est\ bon4_4_c_rapide_2 Le_compte_est_bon4_5 Le_compte_est_bon5 Le_compte_est_bon5_2 Le_compte_est_bon5_ml Le_compte_est_bon5_hs
+all2: Le\ compte\ est\ bon Le\ compte\ est\ bon2 Le\ compte\ est\ bon2_2 Le\ compte\ est\ bon3_byte Le\ compte\ est\ bon4 Le\ compte\ est\ bon4_2 Le\ compte\ est\ bon4_3 Le\ compte\ est\ bon4_4 Le\ compte\ est\ bon4_4_c Le\ compte\ est\ bon4_4_c_rapide Le\ compte\ est\ bon4_4_hs Le\ compte\ est\ bon2_2_hs Le\ compte\ est\ bon2_2_2_hs Le\ compte\ est\ bon4_4_hsIO Le\ compte\ est\ bon4_4_2_hs Le\ compte\ est\ bon4_4_3_hs Le\ compte\ est\ bon4_4_c_rapide_2 Le_compte_est_bon4_5 Le_compte_est_bon5 Le_compte_est_bon5_2 Le_compte_est_bon5_ml Le_compte_est_bon5_hs Le_compte_est_bon5_2_hs
 all: all2 Le\ compte\ est\ bon_2 Le\ compte\ est\ bon4_4_gmp
 
 
@@ -68,7 +68,10 @@ Le\ compte\ est\ bon4_4_hsIO:Le\ compte\ est\ bon4_4IO.hs
 Le_compte_est_bon5_hs:Le_compte_est_bon5.hs
 	ghc Le_compte_est_bon5.hs -O9 -o Le_compte_est_bon5_hs
 
+Le_compte_est_bon5_2_hs:Le_compte_est_bon5_2.hs
+	ghc Le_compte_est_bon5_2.hs -O9 -o Le_compte_est_bon5_2_hs
+
 clean:
 	rm -f *.cm* *.o *.hi 
 cleanall:
-	rm -f *.cm* *.o *.hi Le\ compte\ est\ bon Le\ compte\ est\ bon2 Le\ compte\ est\ bon2_2 Le\ compte\ est\ bon3_byte Le\ compte\ est\ bon4 Le\ compte\ est\ bon4_2 Le\ compte\ est\ bon4_3 Le\ compte\ est\ bon4_4 Le\ compte\ est\ bon4_4_c Le\ compte\ est\ bon4_4_c_rapide Le\ compte\ est\ bon4_4_hs Le\ compte\ est\ bon2_2_hs Le\ compte\ est\ bon2_2_2_hs Le\ compte\ est\ bon4_4_hsIO Le\ compte\ est\ bon4_4_2_hs Le\ compte\ est\ bon4_4_3_hs Le\ compte\ est\ bon4_4_c_rapide_2 Le\ compte\ est\ bon_2 Le\ compte\ est\ bon4_4_gmp Le_compte_est_bon4_5 Le_compte_est_bon5 Le_compte_est_bon5_2 Le_compte_est_bon5_ml Le_compte_est_bon5_hs
+	rm -f *.cm* *.o *.hi Le\ compte\ est\ bon Le\ compte\ est\ bon2 Le\ compte\ est\ bon2_2 Le\ compte\ est\ bon3_byte Le\ compte\ est\ bon4 Le\ compte\ est\ bon4_2 Le\ compte\ est\ bon4_3 Le\ compte\ est\ bon4_4 Le\ compte\ est\ bon4_4_c Le\ compte\ est\ bon4_4_c_rapide Le\ compte\ est\ bon4_4_hs Le\ compte\ est\ bon2_2_hs Le\ compte\ est\ bon2_2_2_hs Le\ compte\ est\ bon4_4_hsIO Le\ compte\ est\ bon4_4_2_hs Le\ compte\ est\ bon4_4_3_hs Le\ compte\ est\ bon4_4_c_rapide_2 Le\ compte\ est\ bon_2 Le\ compte\ est\ bon4_4_gmp Le_compte_est_bon4_5 Le_compte_est_bon5 Le_compte_est_bon5_2 Le_compte_est_bon5_ml Le_compte_est_bon5_hs Le_compte_est_bon5_2_hs
