@@ -163,7 +163,7 @@ instance Show Tree where
 {- dum_pfx is a hack in order to force recreation of the list each time algo_l_size is called -}
 algo_l_size dum_pfx iL iLSize future =
   case iL of
-    [a] -> (a,dum_pfx):future
+    [a] -> a:future
     [] -> future
     _ ->
       let f_listCouples iListCoupleList =
@@ -173,11 +173,11 @@ algo_l_size dum_pfx iL iLSize future =
                 let l2_size = List.length l2 in
                 let f_subcombs1 iListCombs1 =
                       case iListCombs1 of
-                        (elmt1,_):nextComb1 ->
+                        elmt1:nextComb1 ->
                           let val1 = value_node elmt1 in
                           let f_subcombs2 iListCombs2 =
                                 case iListCombs2 of
-                                  (elmt2,_):nextComb2 ->
+                                  elmt2:nextComb2 ->
                                     let val2 = value_node elmt2 in
                                     let node_is_op n op =
                                           case n of                          
@@ -187,31 +187,31 @@ algo_l_size dum_pfx iL iLSize future =
                                           let nextToUpper =
                                                 (f_subcombs2 (nextComb2)) in
                                           if val2 > val1 && val1 > 1 && (val2 `mod` val1) == 0 then
-                                            (Node (val2 `div` val1) elmt2 elmt1 Divi,dum_pfx):nextToUpper
+                                            (Node (val2 `div` val1) elmt2 elmt1 Divi):nextToUpper
                                           else
                                             if  val1 >= val2 && val2 > 1 && (val1 `mod` val2) == 0 then
-                                              (Node (val1 `div` val2) elmt1 elmt2 Divi,dum_pfx):nextToUpper
+                                              (Node (val1 `div` val2) elmt1 elmt2 Divi):nextToUpper
                                             else
                                               nextToUpper in
                                     let nextop3 =
                                           if val1 > 1 && val2 >1 &&
                                              not (node_is_op elmt1 Divi) &&
                                              not (node_is_op elmt2 Divi) then
-                                            (Node (val1 * val2) elmt1 elmt2 Mult,dum_pfx):nextop4
+                                            (Node (val1 * val2) elmt1 elmt2 Mult):nextop4
                                           else
                                             nextop4 in
                                     let nextop2 =
                                           if (val2 > val1) && val1 > 0 then
-                                            (Node (val2 - val1) elmt2 elmt1 Minus,dum_pfx):nextop3
+                                            (Node (val2 - val1) elmt2 elmt1 Minus):nextop3
                                           else if (val1 >= val2) && val2 > 0 then
-                                                 (Node (val1 - val2) elmt2 elmt1 Minus,dum_pfx):nextop3
+                                                 (Node (val1 - val2) elmt2 elmt1 Minus):nextop3
                                                else
                                                  nextop3 in
                                     let nextop1 =
-                                          if val1 > 0 && val2 >0 &&
+                                          if dum_pfx >=0 && val1 > 0 && val2 >0 &&
                                              not (node_is_op elmt1 Minus) &&
                                              not (node_is_op elmt2 Minus) then
-                                            (Node (val1 + val2) elmt1 elmt2 Add,dum_pfx):nextop2
+                                            (Node (val1 + val2) elmt1 elmt2 Add):nextop2
                                           else
                                             nextop2 in
                                     nextop1         
@@ -257,7 +257,7 @@ le_compte_est_bon iL iTarget =
         algo_all_sizes (List.map (\x -> Number x) iL) (List.length iL) in
   let rec_algo iComps iBest =
         case iComps of
-          (n,_):next ->
+          n:next ->
             let val_n = (value_node n) in
             let isNewBest =
                   case iBest of
