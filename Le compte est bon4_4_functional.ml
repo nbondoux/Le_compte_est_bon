@@ -1,6 +1,6 @@
 (* version recursive rapide; donne une solution avec la profondeur minimum 
 ; affiche les résultats intermédiaires
-Version purement fonctionnelle
+Version basée sur des listes, et qui utilise des exceptions
 *)
 
 type operation = Plus|Moins|Mult|Divi;;
@@ -24,15 +24,6 @@ let rec profondeur_arbre arbre=
 match arbre with
   |Noeud (_,ag,ad,_) -> profondeur_arbre ag + profondeur_arbre ad + 1
   | Nombre _ -> 0;;
-
-(* retourne le "poids" des opérateurs de l'arbre; pas utilisé dans cette version de l'algo *)
-let rec poids_arbre arbre =
-match arbre with
-  |Noeud (_,ag,ad,Plus) -> 1 + poids_arbre ag + poids_arbre ad
-  |Noeud (_,ag,ad,Moins) -> 2 + poids_arbre ag + poids_arbre ad
-  |Noeud (_,ag,ad,Mult) -> 3 + poids_arbre ag + poids_arbre ad
-  |Noeud (_,ag,ad,Divi) -> 4 + poids_arbre ag + poids_arbre ad
-  |Nombre _ -> 0;;
 
 
 let rec string_arbre arbre =
@@ -78,24 +69,9 @@ match x with
 
 |Nombre y -> y ;;
 
-
-
-let algo2_pred prof sol p =
-  match sol  with
-      BestArbre (_,n_pr)->
-	if prof < n_pr then
-	  p
-	else
-	  sol
-    |_ -> p ;;
-
-
+exception Exp_algo_sol_found of solution;;
 
 let rec algo l prof best_res  cible=
-  let length_is_one l = match l with 
-      [_] -> true
-    | _ -> false in
-
     if List.exists (fun x -> valeur_Noeud x = cible) l then
       let sol = List.find (fun x -> valeur_Noeud x = cible) l in
       let profa = profondeur_arbre sol in 
@@ -104,69 +80,77 @@ let rec algo l prof best_res  cible=
 		 (string_arbre sol)^
 		 " ; "^
 		 string_of_int(profa));
-	 print_endline "";	
-	 BestArbre (sol,profa))
+	 print_endline "";
+	 raise (Exp_algo_sol_found (BestArbre (sol,profa)))
+        )
       )
-  else
+    else
       (	
-	match best_res with
-	    BestArbre(_,pm) ->
-	      ( if prof >= pm - 1 ||length_is_one l  then
-		  best_res
-		else
-		  algo2 l (prof+1) best_res  cible
-	      )
-	  |SolNull -> 
-	     if length_is_one l  then
-	       best_res
-	     else
+        match best_res with
+	  |BestArbre(_,pm) ->
+	     if prof + 1 < pm then
 	       algo2 l (prof+1) best_res  cible
+             else
+	       best_res
+	  |SolNull -> 
+	     algo2 l (prof+1) best_res  cible
       )
 and
 
- algo2_foreach_op iA iB iBase iTail iPred iBest_res iCible iProf =
+ algo2_foreach_op iA iB iBase iTail iBest_res iCible iProf =
   let val_a = valeur_Noeud iA in
   let val_b = valeur_Noeud iB in
   let new_tail = iBase@iTail in
   let next_algo next_node sol = algo (next_node::new_tail) iProf sol iCible in
-  let sol1 = next_algo (Noeud(val_a+val_b,iA,iB,Plus)) iBest_res in iPred sol1 (
-  let sol2 = next_algo (Noeud(val_a-val_b,iA,iB,Moins)) sol1 in iPred sol2 (
-  let sol3 = next_algo (Noeud(val_a*val_b,iA,iB,Mult)) sol2 in iPred sol3 (
+  let sol1 = next_algo (Noeud(val_a+val_b,iA,iB,Plus)) iBest_res in
+  let sol2 = next_algo (Noeud(val_a-val_b,iA,iB,Moins)) sol1 in
+  let sol3 = next_algo (Noeud(val_a*val_b,iA,iB,Mult)) sol2 in
   let sol4 = (
     if (val_b <> 0  &&  (val_a mod val_b) = 0) then
       next_algo (Noeud(val_a/val_b,iA,iB,Divi)) sol3
     else 
       sol3
-  ) in iPred sol4 (
-  let sol5 = next_algo (Noeud(val_b-val_a,iB,iA,Moins)) sol4 in iPred sol5 (
+  ) in
+  let sol5 = next_algo (Noeud(val_b-val_a,iB,iA,Moins)) sol4 in
       if (val_a <> 0 &&  (val_b mod val_a) = 0) then
 	next_algo (Noeud(val_b/val_a,iB,iA,Divi)) sol5
       else
         sol5
-    )))))
+
 and 
 
- algo2_foreach_b iA iBase iList iPred iBest_res iCible iProf =
+ algo2_foreach_b iA iBase iList iBest_res iCible iProf =
   match iList with
-      b::l -> let sol = (algo2_foreach_op iA b iBase l iPred iBest_res iCible 
+      b::l -> let sol = (algo2_foreach_op iA b iBase l iBest_res iCible 
 			iProf)
-	in iPred sol (algo2_foreach_b iA (b::iBase) l iPred sol iCible iProf)
+	in algo2_foreach_b iA (b::iBase) l sol iCible iProf
     |[] -> iBest_res
 
 and 
- algo2_foreach_a_b iBase iList iPred iBest_res iCible iProf=
+ algo2_foreach_a_b iBase iList iBest_res iCible iProf=
   match iList with
-      a::l -> let sol = (algo2_foreach_b a iBase l iPred iBest_res iCible iProf) in
-	iPred sol (algo2_foreach_a_b (a::iBase) l iPred sol iCible iProf)
+      a::l -> let sol = (algo2_foreach_b a iBase l iBest_res iCible iProf) in
+	algo2_foreach_a_b (a::iBase) l sol iCible iProf
     |[] -> iBest_res
 
 and 
  algo2  l iProf iBest_res iCible =
-  algo2_foreach_a_b [] l (algo2_pred iProf) iBest_res iCible iProf;;
-
+  try (
+    algo2_foreach_a_b [] l iBest_res iCible iProf
+  ) with Exp_algo_sol_found sol -> (
+    match sol with
+        |BestArbre (_,pm) -> (
+            if pm + 1 < iProf then
+              raise (Exp_algo_sol_found sol)
+            else
+              sol
+          )
+        |SolNull -> sol
+  )
+;;
 
 let le_compte_est_bon liste cible =
- match (algo (construct_arbre liste) 0 SolNull  cible)
+ match (try (algo (construct_arbre liste) 0 SolNull  cible) with Exp_algo_sol_found s -> s)
  with
      BestArbre(a,_) -> print_int cible;print_string (" = "^(string_arbre a));print_endline "";
    |_ -> print_string ("No Solution");print_endline "";;

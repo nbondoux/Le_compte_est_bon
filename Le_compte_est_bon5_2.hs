@@ -1,11 +1,9 @@
 module Main where 
 
-import IO
-import System
-import Char
-import List
-
-
+import System.IO as IO
+import System.Environment
+import Data.Char as Char
+import Data.List as List
 
 {-
 this method is built on this model:

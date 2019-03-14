@@ -651,7 +651,7 @@ void lcebFixedSizeGenerator_run(NB_BaseGenerator_t* ioGen) {
             }
           }
 
-          if (val2 > val1) {
+          if (val2 > val1 && val1 > 0) {
             newNode.value=val2 - val1;
             
             newNode.u.Node.ag = elmt2;
@@ -662,7 +662,7 @@ void lcebFixedSizeGenerator_run(NB_BaseGenerator_t* ioGen) {
             newNode.u.Node.ad = elmt2;
           }
                 
-          if (val1 >= val2) {
+          if (val1 >= val2 && val2 > 0) {
             newNode.value=val1 - val2;
             
             newNode.u.Node.op = Minus;

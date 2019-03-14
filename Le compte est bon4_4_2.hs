@@ -5,10 +5,11 @@ module Main where
    the best one, by using the continuation style (without monads)
    main function evaluate each elements of the list and display them   
  -}
-import IO
-import System
-import Char
-import List
+
+import System.IO as IO
+import System.Environment
+import Data.Char as Char
+import Data.List as List
 
 data Operation = Plus|Moins|Mult|Divi
 

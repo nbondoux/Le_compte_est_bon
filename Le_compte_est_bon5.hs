@@ -1,9 +1,9 @@
 module Main where 
 
-import IO
-import System
-import Char
-import List
+import System.IO as IO
+import System.Environment
+import Data.Char as Char
+import Data.List as List
 
 data CompListT a = CompListEnd | CompList a  (() -> (CompListT a))
 
